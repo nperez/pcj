@@ -1,0 +1,257 @@
+NAME
+    POE::Component::Jabber - A POE Component for communicating over Jabber
+
+SYNOPSIS
+     use POE;
+     use POE::Component::Jabber;
+     use POE::Component::Jabber::Error;
+     use POE::Component::Jabber::Status;
+     use POE::Component::Jabber::ProtocolFactory;
+     use POE::Filter::XML::Node;
+     use POE::Filter::XML::NS qw/ :JABBER :IQ /;
+
+     POE::Component::Jabber->new(
+       IP => 'jabber.server',
+       PORT => '5222'
+       HOSTNAME => 'jabber.server',
+       USERNAME => 'username',
+       PASSWORD => 'password',
+       ALIAS => 'PCJ',
+       STATES => {
+             StatusEvent => 'StatusHandler',
+             InputEvent => 'InputHandler',
+             ErrorEvent => 'ErrorHandler',
+       }
+     );
+ 
+     $poe_kernel->post('PCJ', 'connect', $node);
+     $poe_kernel->post('PCJ', 'output_handler', $node);
+     $poe_kernel->post('PCJ', 'return_to_sender', $node);
+
+DESCRIPTION
+    PCJ is a communications component that fits within the POE framework and
+    provides the raw low level footwork of initiating a connection,
+    negotiatating various protocol layers, and authentication necessary for
+    the end developer to focus more on the business end of implementing a
+    client or service.
+
+METHODS
+    new()
+        Accepts many named, required arguments which are listed below. new()
+        will return a reference to the newly created reference to a PCJ
+        object and should be stored. There are many useful methods that can
+        be called on the object to gather various bits of information such
+        as your negotiated JID.
+
+        IP
+          The IP address in dotted quad, or the FQDN for the server.
+
+        PORT
+          The remote port of the server to connect.
+
+        HOSTNAME
+          The hostname of the server. Used in addressing.
+
+        USERNAME
+          The username to be used in authentication (OPTIONAL for jabberd14
+          service connections).
+
+        PASSWORD
+          The password to be used in authentication.
+
+        RESOURCE
+          The resource that will be used for binding and session
+          establishment (OPTIONAL: resources aren't necessary for
+          initialization of service oriented connections, and if not
+          provided for client connections will be automagically generated).
+
+        ALIAS
+          The alias the component should register for use within POE.
+          Defaults to the class name.
+
+        CONNECTIONTYPE
+          This is the type of connection you wish to esablish. Please use
+          the constants provided in PCJ::ProtocolFactory for the basis of
+          this argument. There is no default.
+
+        VERSION
+          If for whatever reason you want to override the protocol version
+          gathered from your ConnectionType, this is the place to do it.
+          Please understand that this value SHOULD NOT be altered, but it is
+          documented here just in case.
+
+        XMLNS
+          If for whatever reason you want to override the protocol's default
+          XML namespace that is gathered from your ConnectionType, use this
+          variable. Please understand that this value SHOULD NOT be altered,
+          but is documented here just in case.
+
+        STREAM
+          If for whatever reason you want to override the xmlns:stream
+          attribute in the <stream:stream/> this is the argument to use.
+          This SHOULD NOT ever need to be altered, but it is available and
+          documented just in case.
+
+        STATEPARENT
+          The alias or session id of the session you want the component to
+          contact. This is optional provided to instantiate PCJ within
+          another POE::Session. In that case, that session will be assumed
+          to be the recepient of events.
+
+        STATES
+
+          StatusEvent
+            The StatusEvent will receive an event for every status change
+            within PCJ. This is useful for providing feedback to the end
+            user on what exactly the client or service is doing. Please see
+            POE::Component::Jabber::Status for exported constants and what
+            they signify.
+
+          InputEvent
+            The InputEvent will receive an event for every jabber packet
+            that comes through the connection once fully initialized. ARG0
+            will be a reference to a POE::Filter::XML::Node. Please see
+            POE::Filter::XML::Node documentation for ways to get the
+            information out of the Nodes and construct Nodes of your own.
+
+          ErrorEvent
+            The error event will be fired upon a number of detected error
+            conditions within PCJ. Please see the
+            POE::Component::Jabber::Error documentation for possible error
+            states.
+
+        DEBUG
+          If bool true, will enable debugging and tracing within the
+          component. All XML sent or received through the component will be
+          printed to STDERR
+
+    wheel() [Protected]
+        wheel() returns the currently stored POE::Wheel reference. If
+        provided an argument, that argument will replace the current
+        POE::Wheel stored.
+
+    sock() [Protected]
+        sock() returns the current socket being used for communication. If
+        provided an argument, that argument will replace the current socket
+        stored.
+
+    sid() [Protected]
+        sid() returns the session ID that was given by the server upon the
+        initial connection. If provided an argument, that argument will
+        replace the current session id stored.
+
+    config() [Protected]
+        config() returns the configuration structure (HASH reference) of PCJ
+        that is used internally. It contains values that are either defaults
+        or were calculated based on arguments provided in the constructor.
+        If provided an argument, that argument will replace the current
+        configuration.
+
+    parent() [Public]
+        parent() returns either the session ID from the intantiating
+        session, or the alias or ID provided in the constructor. If provided
+        an argument, that argument will replace the current parent seesion
+        ID or alias stored.
+
+    input() [Public]
+        input() returns the current event used by PCJ to deliver input
+        events. If provided an argument, that argument will replace the
+        current input event used.
+
+    status() [Public]
+        status() returns the current event used by PCJ to deliver status
+        events. If provided an argument, that argument will replace the
+        current status event used.
+
+    error() [Public]
+        error() returns the current event used by PCJ to deliver error
+        events. If provided an argument, that argument will replace the
+        current error event used.
+
+    pending() [Protected]
+        pending() returns a hash reference to the currently pending
+        return_to_sender transactions keyed by the 'id' attribute of the XML
+        node. If provided an argument, that argument will replace the
+        pending queue.
+
+    queue() [Protected]
+        queue() returns an array reference containing the Nodes sent when
+        there was no suitable initialized connection available. Index zero
+        is the first Node placed into the queue with index one being the
+        second, and so on. See under the EVENTS section, 'purge_queue' for
+        more information.
+
+    _reset() [Private]
+        _reset() returns PCJ back to its initial state and returns nothing;
+
+    _gather_options() [Private]
+        _gather_options() takes an array reference of the arguments provided
+        to new() (ie. \@_) and populates its internal configuration with the
+        values (the same configuration returned by config()).
+
+    relinquish_states() [Protected]
+        relinquish_states() is used by Protocol subclasses to return control
+        of the events back to the core of PCJ. It is typically called when
+        the event PCJ_INIT_FINISH is fired to the status event handler.
+
+EVENTS
+        'output_handler'
+            This is the event that you use to push data over the wire. It
+            accepts only one argument, a reference to a
+            POE::Filter::XML::Node.
+
+        'return_to_sender'
+            This event takes (1) a POE::Filter::XML::Node and gives it a
+            unique id, and (2) a return event and places it in the state
+            machine. Upon receipt of response to the request, the return
+            event is fired with the response packet. Note: the return event
+            is post()ed in the context of the provided or default parant
+            session.
+
+        'shutdown'
+            The shutdown event terminates the XML stream which in turn will
+            trigger the end of the socket's life.
+
+        'connect' and 'reconnect'
+            This event can take (1) the ip address of a new server and (2)
+            the port. This event may also be called without any arguments
+            and it will force the component to [re]connect.
+
+        'purge_queue'
+            If Nodes are sent to the output_handler when there isn't a fully
+            initialized connection, the Nodes are placed into a queue. PCJ
+            will not automatically purge this queue when a suitable
+            connection DOES become available because there is no way to tell
+            if the packets are still valid or not. It is up to the end
+            developer to decide this and fire this event. Packets will be
+            setn in the order in which they were received.
+
+NOTES AND BUGS
+        This is a connection broker. This should not be considered a first
+        class client or service. This broker basically implements whatever
+        core functionality is required to get the end developer to the point
+        of writing upper level functionality quickly.
+
+        In the case of XMPP what is implemented: XMPP Core. A small portion
+        of XMPP IM (session binding).
+
+        Legacy: Basic authentication via iq:auth. (No presence management,
+        no roster management)
+
+        JABBERD14: Basic handshake. (No automatic addressing management of
+        the 'from' attribute)
+
+        JABBERD20: XMPP Core like semantics. Domain binding. (No route
+        packet enveloping or presence management)
+
+        With the major version increase, significant changes have occured in
+        how PCJ handles itself and how it is constructed. PCJ no longer
+        connects when it is instantiated. The 'connect' event must be
+        post()ed for PCJ to connect.
+
+        For example implementations using all four current aspects, please
+        see the examples/ directory in the distribution.
+
+AUTHOR
+        Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
+

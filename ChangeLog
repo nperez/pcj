@@ -1,0 +1,27 @@
+2007-01-26 nperez <nperez@cpan.org>
+	* Maint revision: 2.01
+	* Automated tests are still very new to me. Fix problems with defaults.
+	* Update all module version numbers to stay in sync
+
+2007-01-20 nperez <nperez@cpan.org>
+	* Major revision: 2.0
+	* Reorganized guts into object_states and extensible Protocol specifics
+	* Full documentation for all included modules
+	* Examples reworked with documentation inline
+	* Automated testing written to cover all Protocol dialects
+
+2006-04-30 nperez <nperez@cpan.org>
+	* Bumped version to: 1.21
+	* New handlers for failed connections
+	* New export in PCJ::Error
+	* Update dependancies
+	* Updated installer to Module::Build
+	* Stem off bitrot
+
+2005-12-04 nperez <nperez@cpan.org>
+
+	* Removed kludged TLS support.
+	* Updated PCJ Error to include SSL failures
+	* New dependency: POE::Component::SSLify
+	* Bumped version to: 1.12
+	
