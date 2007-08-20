@@ -14,7 +14,7 @@ use Digest::SHA1 qw/ sha1_hex /;
 
 use base('POE::Component::Jabber::Protocol');
 
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 
 sub get_version()
 {

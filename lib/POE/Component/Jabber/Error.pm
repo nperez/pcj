@@ -14,7 +14,7 @@ use constant
 };
 
 require Exporter;
-our $VERSION = '2.01';
+our $VERSION = '2.02';
 our @ISA = qw/ Exporter /;
 our @EXPORT = qw/ PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL PCJ_BINDFAIL
 	PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL/;
