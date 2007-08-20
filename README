@@ -12,7 +12,7 @@ SYNOPSIS
 
      POE::Component::Jabber->new(
        IP => 'jabber.server',
-       PORT => '5222'
+       PORT => '5222',
        HOSTNAME => 'jabber.server',
        USERNAME => 'username',
        PASSWORD => 'password',
@@ -23,8 +23,8 @@ SYNOPSIS
              ErrorEvent => 'ErrorHandler',
        }
      );
- 
-     $poe_kernel->post('PCJ', 'connect', $node);
+     
+ $poe_kernel->post('PCJ', 'connect', $node);
      $poe_kernel->post('PCJ', 'output_handler', $node);
      $poe_kernel->post('PCJ', 'return_to_sender', $node);
 
@@ -195,63 +195,68 @@ METHODS
         the event PCJ_INIT_FINISH is fired to the status event handler.
 
 EVENTS
-        'output_handler'
-            This is the event that you use to push data over the wire. It
-            accepts only one argument, a reference to a
-            POE::Filter::XML::Node.
+    'output_handler'
+        This is the event that you use to push data over the wire. It
+        accepts only one argument, a reference to a POE::Filter::XML::Node.
 
-        'return_to_sender'
-            This event takes (1) a POE::Filter::XML::Node and gives it a
-            unique id, and (2) a return event and places it in the state
-            machine. Upon receipt of response to the request, the return
-            event is fired with the response packet. Note: the return event
-            is post()ed in the context of the provided or default parant
-            session.
+    'return_to_sender'
+        This event takes (1) a POE::Filter::XML::Node and gives it a unique
+        id, and (2) a return event and places it in the state machine. Upon
+        receipt of response to the request, the return event is fired with
+        the response packet. Note: the return event is post()ed in the
+        context of the provided or default parant session.
 
-        'shutdown'
-            The shutdown event terminates the XML stream which in turn will
-            trigger the end of the socket's life.
+    'shutdown'
+        The shutdown event terminates the XML stream which in turn will
+        trigger the end of the socket's life.
 
-        'connect' and 'reconnect'
-            This event can take (1) the ip address of a new server and (2)
-            the port. This event may also be called without any arguments
-            and it will force the component to [re]connect.
+    'connect' and 'reconnect'
+        This event can take (1) the ip address of a new server and (2) the
+        port. This event may also be called without any arguments and it
+        will force the component to [re]connect.
 
-        'purge_queue'
-            If Nodes are sent to the output_handler when there isn't a fully
-            initialized connection, the Nodes are placed into a queue. PCJ
-            will not automatically purge this queue when a suitable
-            connection DOES become available because there is no way to tell
-            if the packets are still valid or not. It is up to the end
-            developer to decide this and fire this event. Packets will be
-            setn in the order in which they were received.
+    'purge_queue'
+        If Nodes are sent to the output_handler when there isn't a fully
+        initialized connection, the Nodes are placed into a queue. PCJ will
+        not automatically purge this queue when a suitable connection DOES
+        become available because there is no way to tell if the packets are
+        still valid or not. It is up to the end developer to decide this and
+        fire this event. Packets will be setn in the order in which they
+        were received.
 
 NOTES AND BUGS
-        This is a connection broker. This should not be considered a first
-        class client or service. This broker basically implements whatever
-        core functionality is required to get the end developer to the point
-        of writing upper level functionality quickly.
+    This is a connection broker. This should not be considered a first class
+    client or service. This broker basically implements whatever core
+    functionality is required to get the end developer to the point of
+    writing upper level functionality quickly.
 
-        In the case of XMPP what is implemented: XMPP Core. A small portion
-        of XMPP IM (session binding).
+    In the case of XMPP what is implemented: XMPP Core. A small portion of
+    XMPP IM (session binding).
 
-        Legacy: Basic authentication via iq:auth. (No presence management,
-        no roster management)
+    Legacy: Basic authentication via iq:auth. (No presence management, no
+    roster management)
 
-        JABBERD14: Basic handshake. (No automatic addressing management of
-        the 'from' attribute)
+    JABBERD14: Basic handshake. (No automatic addressing management of the
+    'from' attribute)
 
-        JABBERD20: XMPP Core like semantics. Domain binding. (No route
-        packet enveloping or presence management)
+    JABBERD20: XMPP Core like semantics. Domain binding. (No route packet
+    enveloping or presence management)
 
-        With the major version increase, significant changes have occured in
-        how PCJ handles itself and how it is constructed. PCJ no longer
-        connects when it is instantiated. The 'connect' event must be
-        post()ed for PCJ to connect.
+    With the major version increase, significant changes have occured in how
+    PCJ handles itself and how it is constructed. PCJ no longer connects
+    when it is instantiated. The 'connect' event must be post()ed for PCJ to
+    connect.
 
-        For example implementations using all four current aspects, please
-        see the examples/ directory in the distribution.
+    For example implementations using all four current aspects, please see
+    the examples/ directory in the distribution.
 
 AUTHOR
-        Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
+    Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
+
+POD ERRORS
+    Hey! The above document had some coding errors, which are explained
+    below:
+
+    Around line 1054:
+        You forgot a '=back' before '=head1'
 

@@ -845,7 +845,7 @@ POE::Component::Jabber - A POE Component for communicating over Jabber
 
  POE::Component::Jabber->new(
    IP => 'jabber.server',
-   PORT => '5222'
+   PORT => '5222',
    HOSTNAME => 'jabber.server',
    USERNAME => 'username',
    PASSWORD => 'password',
