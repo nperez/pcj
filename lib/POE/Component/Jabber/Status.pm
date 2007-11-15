@@ -25,6 +25,7 @@ use constant
 	'PCJ_STREAMEND'			=> 18,
 	'PCJ_SHUTDOWN_START'	=> 19,
 	'PCJ_SHUTDOWN_FINISH'	=> 20,
+    'PCJ_RECONNECT'         => 21,
 };
 
 require Exporter;
