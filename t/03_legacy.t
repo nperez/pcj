@@ -166,4 +166,4 @@ POE::Session->create
 
 POE::Kernel->run();
 
-exit 1;
+exit 0;
