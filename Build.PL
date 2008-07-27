@@ -71,13 +71,14 @@ Module::Build->new
 	'create_readme' => 1,
 	'requires' =>
 	{
-		'perl'	=>	'5.8.8',
-		'POE'	=>	'0.9500',
-		'Filter::Template' => '1.01',
+		'perl'	=>	'5.10.0',
+		'POE'	=>	'1.003',
+		'Filter::Template' => '1.02',
 		'Digest::SHA1' => '2.11',
-		'Authen::SASL' => '2.10',
+		'Authen::SASL' => '2.12',
 		'MIME::Base64' => '3.07',
 #		'POE::Component::SSLify' => '0.06',
 		'POE::Filter::XML' => '0.31',
+        'Net::SSLeay' => '1.35',
 	}
 )->create_build_script();
