@@ -1,49 +1,58 @@
 ---
 name: POE-Component-Jabber
-version: 2.02
+version: 2.03
 author: []
 abstract: A POE Component for communicating over Jabber
 license: gpl
 resources:
-  license: http://www.opensource.org/licenses/gpl-license.php
+  license: http://opensource.org/licenses/gpl-license.php
 requires:
-  Authen::SASL: 2.10
+  Authen::SASL: 2.12
   Digest::SHA1: 2.11
-  Filter::Template: 1.01
+  Filter::Template: 1.02
   MIME::Base64: 3.07
-  POE: 0.9500
-  POE::Component::SSLify: 0.06
+  Net::SSLeay: 1.35
+  POE: 1.003
   POE::Filter::XML: 0.31
-  perl: 5.8.8
+  perl: 5.10.0
 provides:
   POE::Component::Jabber:
     file: lib/POE/Component/Jabber.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::Error:
     file: lib/POE/Component/Jabber/Error.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::J14:
     file: lib/POE/Component/Jabber/J14.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::J2:
     file: lib/POE/Component/Jabber/J2.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::Legacy:
     file: lib/POE/Component/Jabber/Legacy.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::Protocol:
     file: lib/POE/Component/Jabber/Protocol.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::ProtocolFactory:
     file: lib/POE/Component/Jabber/ProtocolFactory.pm
-    version: 2.02
+    version: 2.03
   POE::Component::Jabber::Status:
     file: lib/POE/Component/Jabber/Status.pm
-    version: 2.02
+    version: 2.03
+  POE::Component::Jabber::Utility::ClientHandle:
+    file: lib/POE/Component/Jabber/Utility/ClientHandle.pm
+    version: 7
+  POE::Component::Jabber::Utility::SSLify:
+    file: lib/POE/Component/Jabber/Utility/SSLify.pm
+    version: 0.1
+  POE::Component::Jabber::Utility::ServerHandle:
+    file: lib/POE/Component/Jabber/Utility/ServerHandle.pm
+    version: 7
   POE::Component::Jabber::XMPP:
     file: lib/POE/Component/Jabber/XMPP.pm
-    version: 2.02
-generated_by: Module::Build version 0.2808
+    version: 2.03
+generated_by: Module::Build version 0.280801
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2
