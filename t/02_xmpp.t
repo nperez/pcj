@@ -52,7 +52,7 @@ POE::Session->create
 				} else {
 					
 					SKIP: { skip('Network tests were declined', 20); }
-					exit 1;
+					exit 0;
 				}
 			},
 		'status_event' =>

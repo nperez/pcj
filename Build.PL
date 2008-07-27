@@ -77,7 +77,7 @@ Module::Build->new
 		'Digest::SHA1' => '2.11',
 		'Authen::SASL' => '2.10',
 		'MIME::Base64' => '3.07',
-		'POE::Component::SSLify' => '0.06',
+#		'POE::Component::SSLify' => '0.06',
 		'POE::Filter::XML' => '0.31',
 	}
 )->create_build_script();
