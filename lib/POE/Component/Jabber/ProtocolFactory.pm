@@ -17,7 +17,7 @@ use constant
 };
 
 require Exporter;
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 our @ISA = qw/ Exporter /;
 our @EXPORT = qw/ JABBERD14_COMPONENT JABBERD20_COMPONENT LEGACY XMPP /;
 

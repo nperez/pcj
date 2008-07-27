@@ -17,7 +17,7 @@ use Authen::SASL;
 
 use base('POE::Component::Jabber::Protocol');
 
-our $VERSION = '2.02';
+our $VERSION = '2.03';
 
 sub get_version()
 {
