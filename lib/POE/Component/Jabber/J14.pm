@@ -127,6 +127,6 @@ documentation for the relevant API changes.
 
 =head1 AUTHOR
 
-Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
+Copyright (c) 2003-2009 Nicholas Perez. Distributed under the GPL.
 
 =cut

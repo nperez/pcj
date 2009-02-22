@@ -78,7 +78,7 @@ Module::Build->new
 		'Authen::SASL' => '2.12',
 		'MIME::Base64' => '3.07',
 #		'POE::Component::SSLify' => '0.06',
-		'POE::Filter::XML' => '0.31',
+		'POE::Filter::XML' => '0.35',
         'Net::SSLeay' => '1.35',
 	}
 )->create_build_script();

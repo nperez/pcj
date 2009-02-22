@@ -115,7 +115,7 @@ POE::Session->create(
 			sub
 			{
 				my $kernel = $_[KERNEL];
-				$kernel->alias_remove();
+				$kernel->alias_remove('Tester');
 			},
 
 		input_event => \&input_event,
@@ -181,7 +181,7 @@ sub input_event()
 	my ($kernel, $heap, $node) = @_[KERNEL, HEAP, ARG0];
 	
 	print "\n===PACKET RECEIVED===\n";
-	print $node->to_str() . "\n";
+	print $node->toString() . "\n";
 	print "=====================\n\n";
 	$kernel->delay_add('test_message', int(rand(10)));
 		
@@ -204,10 +204,10 @@ sub test_message()
 	# get_bare_jid is a helper method included from POE::Filter::XML::Utils.
 	# It returns the user@domain part of the jid (ie. no resources)
 
-	$node->attr('to', get_bare_jid($heap->{'jid'}));
-	$node->insert_tag('body')->data('This is a test sent at: ' . time());
+	$node->setAttribute('to', get_bare_jid($heap->{'jid'}));
+	$node->appendTextChild('body', 'This is a test sent at: ' . time());
 	
-	$envelope->insert_tag($node);
+	$envelope->appendChild($node);
 	
 	$kernel->yield('output_event', $envelope, $heap->{'sid'});
 
@@ -222,7 +222,7 @@ sub output_event()
 	my ($kernel, $heap, $node, $sid) = @_[KERNEL, HEAP, ARG0, ARG1];
 	
 	print "\n===PACKET SENT===\n";
-	print $node->to_str() . "\n";
+	print $node->toString() . "\n";
 	print "=================\n\n";
 	
 	$kernel->post($sid, 'output_handler', $node);
