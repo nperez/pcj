@@ -3,7 +3,7 @@
 ###############################################################################
 #                          
 # XMPPClient Example           
-# (c) Nicholas Perez 2006 - 2009. 
+# (c) Nicholas Perez 2006, 2007. 
 # Licensed under GPLv2     
 #                          
 # Please see the included  
@@ -46,9 +46,9 @@ POE::Session->create(
 				
 				$heap->{'component'} = 
 					POE::Component::Jabber->new(
-						IP => 'nickandperla.net',
+						IP => '10.0.0.1',
 						Port => '5222',
-						Hostname => 'nickandperla.net',
+						Hostname => 'laptop',
 						Username => 'test01',
 						Password => 'test01',
 						Alias => 'COMPONENT',
@@ -96,7 +96,7 @@ POE::Session->create(
 			sub
 			{
 				my $kernel = $_[KERNEL];
-				$kernel->alias_remove('Tester');
+				$kernel->alias_remove();
 			},
 
 		input_event => \&input_event,
@@ -162,7 +162,7 @@ sub input_event()
 	my ($kernel, $heap, $node) = @_[KERNEL, HEAP, ARG0];
 	
 	print "\n===PACKET RECEIVED===\n";
-	print $node->toString() . "\n";
+	print $node->to_str() . "\n";
 	print "=====================\n\n";
 	$kernel->delay_add('test_message', int(rand(10)));
 		
@@ -177,8 +177,8 @@ sub test_message()
 	# get_bare_jid is a helper method included from POE::Filter::XML::Utils.
 	# It returns the user@domain part of the jid (ie. no resources)
 
-	$node->setAttribute('to', get_bare_jid($heap->{'jid'}));
-	$node->appendTextChild('body', 'This is a test sent at: ' . time());
+	$node->attr('to', get_bare_jid($heap->{'jid'}));
+	$node->insert_tag('body')->data('This is a test sent at: ' . time());
 	
 	$kernel->yield('output_event', $node, $heap->{'sid'});
 
@@ -193,7 +193,7 @@ sub output_event()
 	my ($kernel, $heap, $node, $sid) = @_[KERNEL, HEAP, ARG0, ARG1];
 	
 	print "\n===PACKET SENT===\n";
-	print $node->toString() . "\n";
+	print $node->to_str() . "\n";
 	print "=================\n\n";
 	
 	$kernel->post($sid, 'output_handler', $node);

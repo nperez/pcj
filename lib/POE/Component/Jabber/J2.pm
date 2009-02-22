@@ -17,7 +17,7 @@ use Authen::SASL;
 
 use base('POE::Component::Jabber::Protocol');
 
-our $VERSION = '3.00';
+our $VERSION = '2.03';
 
 sub new()
 {   
@@ -90,7 +90,7 @@ sub challenge_response()
 	my $conn = $sasl->client_new("xmpp", $config->{'hostname'});
 	$conn->client_start();
 
-	my $step = $conn->client_step(decode_base64($node->appendText()));
+	my $step = $conn->client_step(decode_base64($node->data()));
 
 	if ($config->{'debug'}) {
 		$heap->debug_message("Decoded Response:\n$step");
@@ -104,7 +104,7 @@ sub challenge_response()
 	}
 
 	my $response = XNode->new('response', ['xmlns', +NS_XMPP_SASL]);
-	$response->appendText($step);
+	$response->data($step);
 
 	$kernel->yield('output_handler', $response, 1);
 }
@@ -119,7 +119,7 @@ sub init_input_handler()
 
 	if ($config->{'debug'})
 	{
-		$heap->debug_message("Recd: ".$node->toString());
+		$heap->debug_message("Recd: ".$node->to_str());
 	}
 	
 	if(exists($attrs->{'id'}))
@@ -130,24 +130,24 @@ sub init_input_handler()
 			$kernel->post($array->[0], $array->[1], $node);
 			return;
 		}
-	} elsif($node->nodeName() eq 'stream:stream') {
+	} elsif($node->name() eq 'stream:stream') {
 
-		$self->{'sid'} = $node->getAttribute('id');
+		$self->{'sid'} = $node->attr('id');
 
-	} elsif($node->nodeName() eq 'challenge') {
+	} elsif($node->name() eq 'challenge') {
 		
 		$kernel->yield('challenge_response', $node);
 
-	} elsif($node->nodeName() eq 'failure' and 
-		$node->getAttribute('xmlns') eq +NS_XMPP_SASL) {
+	} elsif($node->name() eq 'failure' and 
+		$node->attr('xmlns') eq +NS_XMPP_SASL) {
 
 		$heap->debug_message('SASL Negotiation Failed');
 		$kernel->yield('shutdown');
 		$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
 	
-	} elsif($node->nodeName() eq 'stream:features') {
+	} elsif($node->name() eq 'stream:features') {
 
-		my $clist = $node->getChildrenHash();
+		my $clist = $node->get_children_hash();
 
 		if(exists($clist->{'starttls'}))
 		{
@@ -170,7 +170,7 @@ sub init_input_handler()
 			{
 				if($mech->data() eq 'DIGEST-MD5')
 				{
-					$kernel->yield('set_auth', $mech->appendText());
+					$kernel->yield('set_auth', $mech->data());
 					$kernel->post(
 						$heap->parent(),
 						$heap->status(),
@@ -179,7 +179,7 @@ sub init_input_handler()
 				}
 			}
 			
-			$heap->debug_message('Unknown mechanism: '.$node->toString());
+			$heap->debug_message('Unknown mechanism: '.$node->to_str());
 			$kernel->yield('shutdown');
 			$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
 		
@@ -201,19 +201,19 @@ sub init_input_handler()
 			
 			if(defined($config->{'bindoption'}))
 			{
-				$bind->appendChild($config->{'bindoption'});
+				$bind->insert_tag($config->{'bindoption'});
 			}
 			
 			$kernel->yield('return_to_sender', 'binding', $bind);
 			$kernel->post($heap->parent(), $heap->status(), +PCJ_BINDNEGOTIATE);
 		}
 
-	} elsif($node->nodeName() eq 'proceed') {
+	} elsif($node->name() eq 'proceed') {
 
 		$kernel->yield('build_tls_wheel');
 		$kernel->yield('initiate_stream');
 	
-	} elsif($node->nodeName() eq 'success') {
+	} elsif($node->name() eq 'success') {
 
 		$kernel->yield('initiate_stream');
 		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
@@ -226,7 +226,7 @@ sub binding()
 {
 	my ($kernel, $heap, $node) = @_[KERNEL, HEAP, ARG0];
 
-	my $attr = $node->getAttribute('error');
+	my $attr = $node->attr('error');
 	my $config = $heap->config();
 
 	if(!$attr)
@@ -240,7 +240,7 @@ sub binding()
 	} else {
 
 		$heap->debug_message('Unable to BIND, yet binding required: '.
-			$node->toString());
+			$node->to_str());
 		$kernel->yield('shutdown');
 		$kernel->post($heap->parent(), $heap->error(), +PCJ_BINDFAIL);
 	}
@@ -343,13 +343,9 @@ This Protocol may implement the spec, but this spec hasn't been touched in
 quite some time. If for some reason my implementation fails against a
 particular jabberd2 version, please let me know.
 
-The underlying backend has changed this release to now use a new Node
-implementation based on XML::LibXML::Element. Please see POE::Filter::XML::Node
-documentation for the relevant API changes.
-
 =head1 AUTHOR
 
-Copyright (c) 2003-2009 Nicholas Perez. Distributed under the GPL.
+Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
 
 =cut
 

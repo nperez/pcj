@@ -14,7 +14,7 @@ use Digest::SHA1 qw/ sha1_hex /;
 
 use base('POE::Component::Jabber::Protocol');
 
-our $VERSION = '3.00';
+our $VERSION = '2.03';
 
 sub get_version()
 {
@@ -42,7 +42,7 @@ sub set_auth()
 
 	my $node = XNode->new('handshake');
 	my $config = $heap->config();
-	$node->appendText(sha1_hex($self->{'sid'}.$config->{'password'}));
+	$node->data(sha1_hex($self->{'sid'}.$config->{'password'}));
 	$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHNEGOTIATE);
 	$kernel->yield('output_handler', $node, 1);
 	return;
@@ -52,7 +52,7 @@ sub init_input_handler()
 {
 	my ($kernel, $heap, $self, $node) = @_[KERNEL, HEAP, OBJECT, ARG0];
 	
-	if($node->nodeName() eq 'handshake')
+	if($node->name() eq 'handshake')
 	{	
 		my $config = $heap->config();
 		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
@@ -60,14 +60,14 @@ sub init_input_handler()
 		$heap->jid($config->{'hostname'});
 		$heap->relinquish_states();
 
-	} elsif($node->nodeName() eq 'stream:stream') {
+	} elsif($node->name() eq 'stream:stream') {
 	
 		$self->{'sid'} = $node->attr('id');
 		$kernel->yield('set_auth');
 	
 	} else {
 
-		$heap->debug_message('Unknown state: ' . $node->toString());
+		$heap->debug_message('Unknown state: ' . $node->to_str());
 		$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
 	}
 }
@@ -121,12 +121,8 @@ Also be aware that before this protocol was documented as an XEP, it was widely
 implemented with loose rules. I conform to this document. If there is a problem
 with the implementation against older server implementations, let me know.
 
-The underlying backend has changed this release to now use a new Node
-implementation based on XML::LibXML::Element. Please see POE::Filter::XML::Node
-documentation for the relevant API changes.
-
 =head1 AUTHOR
 
-Copyright (c) 2003-2009 Nicholas Perez. Distributed under the GPL.
+Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
 
 =cut

@@ -37,7 +37,7 @@ use constant
 
 };
 
-our $VERSION = '3.00';
+our $VERSION = '2.03';
 
 sub new()
 {
@@ -441,7 +441,7 @@ sub return_to_sender()
 	my ($kernel, $self, $session, $sender, $event, $node) = 
 		@_[KERNEL, OBJECT, SESSION, SENDER, ARG0, ARG1];
 	
-	my $attrs = $node->getAttributes();
+	my $attrs = $node->get_attrs();
 	my $pid;
 	
 	if(exists($attrs->{'id'}))
@@ -454,7 +454,7 @@ sub return_to_sender()
 				$self->[+_pcj_id]->clone()->hexdigest())
 					->clone()->hexdigest();
 
-			$node->setAttribute('id', $pid);
+			$node->attr('id', $pid);
 		}
 
 		$pid = $attrs->{'id'};
@@ -465,7 +465,7 @@ sub return_to_sender()
 			$self->[+_pcj_id]->clone()->hexdigest())
 				->clone()->hexdigest();
 		
-		$node->setAttribute('id', $pid);
+		$node->attr('id', $pid);
 	}
 	
 	my $state = $session == $sender ? 1 : undef;
@@ -538,17 +538,16 @@ sub initiate_stream()
 	my ($kernel, $self, $sender, $session) = 
 		@_[KERNEL, OBJECT, SENDER, SESSION];
 
-	my $element = XNode->new('stream:stream');
-	$element->setAttributes
-    (	
-        [
+	my $element = XNode->new
+	(
+		'stream:stream',
+		[
 			'to', $self->[+_pcj_config]->{'hostname'}, 
 			'xmlns', $self->[+_pcj_config]->{'xmlns'}, 
 			'xmlns:stream', $self->[+_pcj_config]->{'stream'}, 
 			'version', $self->[+_pcj_config]->{'version'}
 		]
-	);
-    $element->stream_start(1);
+	)->stream_start(1);
 	
 	my $state = $session == $sender ? 1 : undef;
 	$kernel->yield('output_handler', $element, $state);
@@ -592,8 +591,7 @@ sub shutdown()
 {
 	my ($kernel, $self) = @_[KERNEL, OBJECT];
 
-	my $node = XNode->new('stream:stream');
-    $node->stream_end(1);
+	my $node = XNode->new('stream:stream')->stream_end(1);
 	
 	$self->[+_pcj_shutdown] = 1;
 
@@ -664,7 +662,7 @@ sub debug_output_handler()
 	{
 		if($self->[+_pcj_init_finished] || $state)
 		{	
-			$self->debug_message('Sent: ' . $node->toString());
+			$self->debug_message('Sent: ' . $node->to_str());
 			$self->[+_pcj_wheel]->put($node);
 			$kernel->post(
 				$self->[+_pcj_parent],
@@ -674,7 +672,7 @@ sub debug_output_handler()
 		} else {
 			
 			$self->debug_message('Still initialising.');
-			$self->debug_message('Queued: ' . $node->toString());
+			$self->debug_message('Queued: ' . $node->to_str());
 			push(@{$self->[+_pcj_queue]}, $node);
 			$self->debug_message(
 				'Queued COUNT: ' . scalar(@{$self->[+_pcj_queue]}));
@@ -687,7 +685,7 @@ sub debug_output_handler()
 	} else {
 		
 		$self->debug_message('There is no wheel present.');
-		$self->debug_message('Queued: ' . $node->toString());
+		$self->debug_message('Queued: ' . $node->to_str());
 		$self->debug_message(
 			'Queued COUNT: ' . scalar(@{$self->[+_pcj_queue]}));
 		push(@{$self->[+_pcj_queue]}, $node);
@@ -751,7 +749,7 @@ sub input_handler()
 		$self->[+_pcj_status], 
 		+PCJ_NODERECEIVED);
 	
-	my $attrs = $node->getAttributes();		
+	my $attrs = $node->get_attrs();		
 	
 	if(exists($attrs->{'id'}))
 	{
@@ -780,9 +778,9 @@ sub debug_input_handler()
 		$self->[+_pcj_status], 
 		+PCJ_NODERECEIVED);
 	
-	$self->debug_message("Recd: ".$node->toString());
+	$self->debug_message("Recd: ".$node->to_str());
 
-	my $attrs = $node->getAttributes();
+	my $attrs = $node->get_attrs();
 
 	if(exists($attrs->{'id'}))
 	{

@@ -17,7 +17,7 @@ use Authen::SASL;
 
 use base('POE::Component::Jabber::Protocol');
 
-our $VERSION = '3.00';
+our $VERSION = '2.03';
 
 sub get_version()
 {
@@ -72,7 +72,7 @@ sub set_auth()
 		$auth_str .= $config->{'username'};
 		$auth_str .= "\0";
 		$auth_str .= $config->{'password'};	   
-		$node->appendText(encode_base64($auth_str));	
+		$node->data(encode_base64($auth_str));	
 	}
 
 	$kernel->yield('output_handler', $node, 1);
@@ -89,14 +89,14 @@ sub challenge_response()
 	if ($config->{'debug'}) {
 		
 		$heap->debug_message("Server sent a challenge.  Decoded Challenge:\n".
-			decode_base64($node->textContent()));
+			decode_base64($node->data()));
 	}
 	
 	my $sasl = $self->{'challenge'};
 	my $conn = $sasl->client_new('xmpp', $config->{'hostname'});
 	$conn->client_start();
 
-	my $step = $conn->client_step(decode_base64($node->textContent()));
+	my $step = $conn->client_step(decode_base64($node->data()));
 	
 	$step ||= '';
 
@@ -109,7 +109,7 @@ sub challenge_response()
 	$step =~ s/\s+//go;
 
 	my $response = XNode->new('response', ['xmlns', +NS_XMPP_SASL]);
-	$response->appendText($step);
+	$response->data($step);
 
 	$kernel->yield('output_handler', $response, 1);
 	return;
@@ -119,13 +119,13 @@ sub init_input_handler()
 {
 	my ($kernel, $heap, $self, $node) = @_[KERNEL, HEAP, OBJECT, ARG0];
 	
-	my $attrs = $node->getAttributes();
+	my $attrs = $node->get_attrs();
 	my $config = $heap->config();
-	my $name = $node->nodeName();
+	my $name = $node->name();
 
 	if ($config->{'debug'})
 	{
-		$heap->debug_message("Recd: ".$node->toString());
+		$heap->debug_message("Recd: ".$node->to_str());
 	}
 	
 	if(exists($attrs->{'id'}))
@@ -153,7 +153,7 @@ sub init_input_handler()
 	
 	} elsif($name eq 'stream:features') {
 	
-		my $clist = $node->getChildrenHash();
+		my $clist = $node->get_children_hash();
 
 		if(exists($clist->{'starttls'}))
 		{
@@ -164,12 +164,12 @@ sub init_input_handler()
 		} elsif(exists($clist->{'mechanisms'})) {
 			
 			$self->{'MECHANISMS'} = 1;
-			my @mechs = $clist->{'mechanisms'}->[0]->getChildrenByTagName('*');
-			foreach my $mech (@mechs)
+			my $mechs = $clist->{'mechanisms'}->get_sort_children();
+			foreach my $mech (@$mechs)
 			{
-				if($mech->textContent() eq 'DIGEST-MD5' or $mech->textContent() eq 'PLAIN')
+				if($mech->data() eq 'DIGEST-MD5' or $mech->data() eq 'PLAIN')
 				{
-					$kernel->yield('set_auth', $mech->textContent());
+					$kernel->yield('set_auth', $mech->data());
 					$kernel->post(
 						$heap->parent(), 
 						$heap->status(),
@@ -178,16 +178,16 @@ sub init_input_handler()
 				}
 			}
 			
-			$heap->debug_message('Unknown mechanism: '.$node->toString());
+			$heap->debug_message('Unknown mechanism: '.$node->to_str());
 			$kernel->yield('shutdown');
 			$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
 		
 		} elsif(exists($clist->{'bind'})) {
 		
 			my $iq = XNode->new('iq', ['type', +IQ_SET]);
-			$iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
-				->appendChild('resource')
-				->appendText($config->{'resource'});
+			$iq->insert_tag('bind', ['xmlns', +NS_XMPP_BIND])
+				->insert_tag('resource')
+				->data($config->{'resource'});
 			
 			$self->{'STARTSESSION'} = 1 if exists($clist->{'session'});
 			$kernel->yield('return_to_sender', 'binding', $iq);
@@ -236,7 +236,7 @@ sub binding()
 {
 	my ($kernel, $heap, $self, $node) = @_[KERNEL, HEAP, OBJECT, ARG0];
 
-	my $attr = $node->getAttribute('type');
+	my $attr = $node->attr('type');
 
 	my $config = $heap->config();
 
@@ -245,7 +245,7 @@ sub binding()
 		if($self->{'STARTSESSION'})
 		{
 			my $iq = XNode->new('iq', ['type', +IQ_SET]);
-			$iq->appendChild('session', ['xmlns', +NS_XMPP_SESSION]);
+			$iq->insert_tag('session', ['xmlns', +NS_XMPP_SESSION]);
 
 			$kernel->yield('return_to_sender', 'session_establish', $iq);
 			$kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
@@ -260,37 +260,37 @@ sub binding()
 			$kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
 			$kernel->post($heap->parent(),$heap->status(), +PCJ_INIT_FINISHED);
 		}
-        
-		$heap->jid($node->getSingleChildByTagName('bind')->getSingleChildByTagName('jid')->textContent());
+
+		$heap->jid($node->get_tag('bind')->get_tag('jid')->data());
 	
 	} elsif($attr eq +IQ_ERROR) {
 
-		my $error = $node->getSingleChildByTagName('error');
+		my $error = $node->get_tag('error');
 
-		if($error->getAttribute('type') eq 'modify')
+		if($error->attr('type') eq 'modify')
 		{
 			my $iq = XNode->new('iq', ['type', +IQ_SET]);
-			$iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
-				->appendChild('resource')
-				->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
+			$iq->insert_tag('bind', ['xmlns', +NS_XMPP_BIND])
+				->insert_tag('resource')
+				->data(md5_hex(time().rand().$$.rand().$^T.rand()));
 			$kernel->yield('return_to_sender', 'binding', $iq);
 		
-		} elsif($error->getAttribute('type') eq 'cancel') {
+		} elsif($error->attr('type') eq 'cancel') {
 
-			my $clist = $error->getChildrenHash();
+			my $clist = $error->get_children_hash();
 			
 			if(exists($clist->{'conflict'}))
 			{
 				my $iq = XNode->new('iq', ['type', +IQ_SET]);
-				$iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
-					->appendChild('resource')
-					->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
+				$iq->insert_tag('bind', ['xmlns', +NS_XMPP_BIND])
+					->insert_tag('resource')
+					->data(md5_hex(time().rand().$$.rand().$^T.rand()));
 				$kernel->yield('return_to_sender', 'binding', $iq);
 			
 			} else {
 			
 				$heap->debug_message('Unable to BIND, yet binding required: '.
-					$node->toString());
+					$node->to_str());
 
 				$kernel->yield('shutdown');
 				$kernel->post($heap->parent(), $heap->error(), +PCJ_BINDFAIL);
@@ -305,7 +305,7 @@ sub session_establish()
 {
 	my ($kernel, $heap, $node) = @_[KERNEL, HEAP, ARG0];
 
-	my $attr = $node->getAttribute('type');
+	my $attr = $node->attr('type');
 
 	my $config = $heap->config();
 	
@@ -318,7 +318,7 @@ sub session_establish()
 	} elsif($attr eq +IQ_ERROR) {
 
 		$heap->debug_message('Unable to intiate SESSION, yet session required');
-		$heap->debug_message($node->toString());
+		$heap->debug_message($node->to_str());
 		$kernel->yield('shutdown');
 		$kernel->post($heap->parent(), $heap->error(), +PCJ_SESSIONFAIL);
 	}
@@ -429,13 +429,13 @@ implementations are free to include more strigent mechanisms, but these are the
 bare minimum required. (And PLAIN isn't /really/ allowed by the spec, but it is
 included because it was a requested feature)
 
-The underlying backend has changed this release to now use a new Node
-implementation based on XML::LibXML::Element. Please see POE::Filter::XML::Node
-documentation for the relevant API changes.
+Also, XEP-77 (in-band registration) is NOT supported, but is planned for the 
+next release. Until then, authentication failures are treated as fatal and PCJ
+will shutdown.
 
 =head1 AUTHOR
 
-Copyright (c) 2003-2009 Nicholas Perez. Distributed under the GPL.
+Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
 
 =cut
 
