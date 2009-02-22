@@ -2,7 +2,7 @@ package POE::Component::Jabber::Protocol;
 use warnings;
 use strict;
 
-our $VERSION = '2.03';
+our $VERSION = '3.00';
 
 sub new() 
 {

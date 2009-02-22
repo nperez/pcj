@@ -17,7 +17,7 @@ use Authen::SASL;
 
 use base('POE::Component::Jabber::Protocol');
 
-our $VERSION = '2.03';
+our $VERSION = '3.00';
 
 sub new()
 {   
@@ -90,7 +90,7 @@ sub challenge_response()
 	my $conn = $sasl->client_new("xmpp", $config->{'hostname'});
 	$conn->client_start();
 
-	my $step = $conn->client_step(decode_base64($node->data()));
+	my $step = $conn->client_step(decode_base64($node->appendText()));
 
 	if ($config->{'debug'}) {
 		$heap->debug_message("Decoded Response:\n$step");
@@ -104,7 +104,7 @@ sub challenge_response()
 	}
 
 	my $response = XNode->new('response', ['xmlns', +NS_XMPP_SASL]);
-	$response->data($step);
+	$response->appendText($step);
 
 	$kernel->yield('output_handler', $response, 1);
 }
@@ -119,7 +119,7 @@ sub init_input_handler()
 
 	if ($config->{'debug'})
 	{
-		$heap->debug_message("Recd: ".$node->to_str());
+		$heap->debug_message("Recd: ".$node->toString());
 	}
 	
 	if(exists($attrs->{'id'}))
@@ -130,24 +130,24 @@ sub init_input_handler()
 			$kernel->post($array->[0], $array->[1], $node);
 			return;
 		}
-	} elsif($node->name() eq 'stream:stream') {
+	} elsif($node->nodeName() eq 'stream:stream') {
 
-		$self->{'sid'} = $node->attr('id');
+		$self->{'sid'} = $node->getAttribute('id');
 
-	} elsif($node->name() eq 'challenge') {
+	} elsif($node->nodeName() eq 'challenge') {
 		
 		$kernel->yield('challenge_response', $node);
 
-	} elsif($node->name() eq 'failure' and 
-		$node->attr('xmlns') eq +NS_XMPP_SASL) {
+	} elsif($node->nodeName() eq 'failure' and 
+		$node->getAttribute('xmlns') eq +NS_XMPP_SASL) {
 
 		$heap->debug_message('SASL Negotiation Failed');
 		$kernel->yield('shutdown');
 		$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
 	
-	} elsif($node->name() eq 'stream:features') {
+	} elsif($node->nodeName() eq 'stream:features') {
 
-		my $clist = $node->get_children_hash();
+		my $clist = $node->getChildrenHash();
 
 		if(exists($clist->{'starttls'}))
 		{
@@ -170,7 +170,7 @@ sub init_input_handler()
 			{
 				if($mech->data() eq 'DIGEST-MD5')
 				{
-					$kernel->yield('set_auth', $mech->data());
+					$kernel->yield('set_auth', $mech->appendText());
 					$kernel->post(
 						$heap->parent(),
 						$heap->status(),
@@ -179,7 +179,7 @@ sub init_input_handler()
 				}
 			}
 			
-			$heap->debug_message('Unknown mechanism: '.$node->to_str());
+			$heap->debug_message('Unknown mechanism: '.$node->toString());
 			$kernel->yield('shutdown');
 			$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
 		
@@ -201,19 +201,19 @@ sub init_input_handler()
 			
 			if(defined($config->{'bindoption'}))
 			{
-				$bind->insert_tag($config->{'bindoption'});
+				$bind->appendChild($config->{'bindoption'});
 			}
 			
 			$kernel->yield('return_to_sender', 'binding', $bind);
 			$kernel->post($heap->parent(), $heap->status(), +PCJ_BINDNEGOTIATE);
 		}
 
-	} elsif($node->name() eq 'proceed') {
+	} elsif($node->nodeName() eq 'proceed') {
 
 		$kernel->yield('build_tls_wheel');
 		$kernel->yield('initiate_stream');
 	
-	} elsif($node->name() eq 'success') {
+	} elsif($node->nodeName() eq 'success') {
 
 		$kernel->yield('initiate_stream');
 		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
@@ -226,7 +226,7 @@ sub binding()
 {
 	my ($kernel, $heap, $node) = @_[KERNEL, HEAP, ARG0];
 
-	my $attr = $node->attr('error');
+	my $attr = $node->getAttribute('error');
 	my $config = $heap->config();
 
 	if(!$attr)
@@ -240,7 +240,7 @@ sub binding()
 	} else {
 
 		$heap->debug_message('Unable to BIND, yet binding required: '.
-			$node->to_str());
+			$node->toString());
 		$kernel->yield('shutdown');
 		$kernel->post($heap->parent(), $heap->error(), +PCJ_BINDFAIL);
 	}
@@ -342,6 +342,10 @@ This handles the domain binding
 This Protocol may implement the spec, but this spec hasn't been touched in 
 quite some time. If for some reason my implementation fails against a
 particular jabberd2 version, please let me know.
+
+The underlying backend has changed this release to now use a new Node
+implementation based on XML::LibXML::Element. Please see POE::Filter::XML::Node
+documentation for the relevant API changes.
 
 =head1 AUTHOR
 
