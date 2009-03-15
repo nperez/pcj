@@ -4,9 +4,9 @@ const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
-use POE qw/ Wheel::ReadWrite Component::Client::TCP /;
-use POE::Component::Jabber::Error;
-use POE::Component::Jabber::Status;
+use 5.010;
+use POE;
+use POE::Component::Jabber::Events;
 use POE::Filter::XML;
 use POE::Filter::XML::Node;
 use POE::Filter::XML::NS qw/ :JABBER :IQ /;
@@ -43,7 +43,7 @@ sub set_auth()
 	my $node = XNode->new('handshake');
 	my $config = $heap->config();
 	$node->appendText(sha1_hex($self->{'sid'}.$config->{'password'}));
-	$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHNEGOTIATE);
+	$kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
 	$kernel->yield('output_handler', $node, 1);
 	return;
 }
@@ -52,24 +52,31 @@ sub init_input_handler()
 {
 	my ($kernel, $heap, $self, $node) = @_[KERNEL, HEAP, OBJECT, ARG0];
 	
-	if($node->nodeName() eq 'handshake')
-	{	
-		my $config = $heap->config();
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_INIT_FINISHED);
-		$heap->jid($config->{'hostname'});
-		$heap->relinquish_states();
+    given($node->nodeName())
+    {
+        when('handshake')
+        {	
+            my $config = $heap->config();
+            $kernel->post($heap->events(), +PCJ_AUTHSUCCESS);
+            $kernel->post($heap->events(), +PCJ_INIT_FINISHED);
+            $heap->jid($config->{'hostname'});
+            $heap->relinquish_states();
 
-	} elsif($node->nodeName() eq 'stream:stream') {
-	
-		$self->{'sid'} = $node->attr('id');
-		$kernel->yield('set_auth');
-	
-	} else {
+        }
+        
+        when('stream:stream')
+        {
+            $self->{'sid'} = $node->attr('id');
+            $kernel->yield('set_auth');
+        
+        }
 
-		$heap->debug_message('Unknown state: ' . $node->toString());
-		$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-	}
+        default
+        {
+            $heap->debug_message('Unknown state: ' . $node->toString());
+            $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+        }
+    }
 }
 
 1;

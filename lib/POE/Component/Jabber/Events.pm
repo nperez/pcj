@@ -1,4 +1,4 @@
-package POE::Component::Jabber::Status;
+package POE::Component::Jabber::Events;
 use warnings;
 use strict;
 
@@ -26,6 +26,14 @@ use constant
 	'PCJ_SHUTDOWN_START'	=> 'PCJ_SHUTDOWN_START',
 	'PCJ_SHUTDOWN_FINISH'	=> 'PCJ_SHUTDOWN_FINISH',
     'PCJ_RECONNECT'         => 'PCJ_RECONNECT',
+    'PCJ_INIT_FINISHED'     => 'PCJ_INIT_FINISHED',
+    'PCJ_SOCKETFAIL'        => 'PCJ_SOCKETFAIL',
+    'PCJ_SOCKETDISCONNECT'  => 'PCJ_SOCKETDISCONNECT',
+    'PCJ_AUTHFAIL'          => 'PCJ_AUTHFAIL',
+    'PCJ_BINDFAIL'          => 'PCJ_BINDFAIL',
+    'PCJ_SESSIONFAIL'       => 'PCJ_SESSIONFAIL',
+    'PCJ_SSLFAIL'           => 'PCJ_SSLFAIL',
+    'PCJ_CONNECTFAIL'       => 'PCJ_CONNECTFAIL',
 };
 
 require Exporter;
@@ -35,8 +43,9 @@ our @EXPORT = qw/ PCJ_CONNECT PCJ_CONNECTING PCJ_CONNECTED PCJ_STREAMSTART
 	PCJ_SSLNEGOTIATE PCJ_SSLSUCCESS PCJ_AUTHNEGOTIATE PCJ_AUTHSUCCESS 
 	PCJ_BINDNEGOTIATE PCJ_BINDSUCCESS PCJ_SESSIONNEGOTIATE PCJ_SESSIONSUCCESS 
 	PCJ_RECONNECT PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START 
-	PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START 
-	PCJ_SHUTDOWN_FINISH /;
+	PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START PCJ_INIT_FINISHED
+	PCJ_SHUTDOWN_FINISH PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL 
+    PCJ_BINDFAIL PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL/;
 
 1;
 
@@ -46,7 +55,7 @@ __END__
 
 =head1 NAME
 
-POE::Component::Jabber::Status
+POE::Component::Jabber::Events
 
 =head1 SYNOPSIS
 
@@ -172,12 +181,6 @@ tearing down the connection.
 This indicates that 'shutdown' is complete.
 
 =back
-
-=head1 NOTES
-
-These Statuses should remain fairly constant, but like the note in PCJ::Error, 
-these Status events are not written in stone. They are written in vim and are 
-subject to change.
 
 =head1 AUTHOR
 

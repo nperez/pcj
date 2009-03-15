@@ -4,10 +4,10 @@ const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
+use 5.010;
 use POE qw/ Wheel::ReadWrite /;
 use POE::Component::Jabber::Utility::SSLify qw/ Client_SSLify /;
-use POE::Component::Jabber::Error;
-use POE::Component::Jabber::Status;
+use POE::Component::Jabber::Events;
 use POE::Filter::XML;
 use POE::Filter::XML::Node;
 use POE::Filter::XML::NS qw/ :JABBER :IQ /;
@@ -135,101 +135,115 @@ sub init_input_handler()
 		{
 			my $array = delete $pending->{$attrs->{'id'}};
 			$kernel->post($array->[0], $array->[1], $node);
+            return;
 		}
-	
-	} elsif($name eq 'stream:stream') {
-	
-		$self->{'sid'} = $attrs->{'id'};
-	
-	} elsif($name eq 'challenge') {
-	
-		$kernel->yield('challenge_response', $node);
-	
-	} elsif($name eq 'failure' and $attrs->{'xmlns'} eq +NS_XMPP_SASL) {
-		
-		$heap->debug_message('SASL Negotiation Failed');
-		$kernel->yield('shutdown');
-		$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-	
-	} elsif($name eq 'stream:features') {
-	
-		my $clist = $node->getChildrenHash();
-
-		if(exists($clist->{'starttls'}))
-		{
-			my $starttls = XNode->new('starttls', ['xmlns', +NS_XMPP_TLS]);
-			$kernel->yield('output_handler', $starttls, 1);
-			$kernel->post($heap->parent(), $heap->status(), +PCJ_SSLNEGOTIATE);
-		
-		} elsif(exists($clist->{'mechanisms'})) {
-			
-			$self->{'MECHANISMS'} = 1;
-			my @mechs = $clist->{'mechanisms'}->[0]->getChildrenByTagName('*');
-			foreach my $mech (@mechs)
-			{
-				if($mech->textContent() eq 'DIGEST-MD5' or $mech->textContent() eq 'PLAIN')
-				{
-					$kernel->yield('set_auth', $mech->textContent());
-					$kernel->post(
-						$heap->parent(), 
-						$heap->status(),
-						+PCJ_AUTHNEGOTIATE);
-					return;
-				}
-			}
-			
-			$heap->debug_message('Unknown mechanism: '.$node->toString());
-			$kernel->yield('shutdown');
-			$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-		
-		} elsif(exists($clist->{'bind'})) {
-		
-			my $iq = XNode->new('iq', ['type', +IQ_SET]);
-			$iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
-				->appendChild('resource')
-				->appendText($config->{'resource'});
-			
-			$self->{'STARTSESSION'} = 1 if exists($clist->{'session'});
-			$kernel->yield('return_to_sender', 'binding', $iq);
-			$kernel->post($heap->parent(), $heap->status(), +PCJ_BINDNEGOTIATE);
-		
-		} else {
-
-			# If we get here, it means the server has decided TLS isn't 
-			# necessary, or that it is a non-compliant server and has skipped
-			# SASL negotition. Check for MECHANISMS flag. If it is present then
-			# we are finished with connection initialization.
-			#
-			# See http://www.xmpp.org/rfcs/rfc3920.html for more info
-			
-			if($self->{'MECHANISMS'})
-			{
-
-				$heap->relinquish_states();
-				$kernel->post(
-					$heap->parent(),
-					$heap->status(), 
-					+PCJ_INIT_FINISHED);
-			
-			} else {
-
-				$heap->debug_message('Non-compliant server implementation! '.
-					'SASL negotiation not initiated.');
-				$kernel->yield('shutdown');
-				$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-			}
-		}
-
-	} elsif($name eq 'proceed') {
-	
-		$kernel->yield('build_tls_wheel');
-	
-	} elsif($name eq 'success') {
-		
-		$kernel->yield('initiate_stream');
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
 	}
-	return;	
+    
+    given($name)
+    {   
+        when ('stream:stream') 
+        {
+            $self->{'sid'} = $attrs->{'id'};
+        } 
+
+        when ('challenge') 
+        {
+            $kernel->yield('challenge_response', $node);
+        } 
+        
+        when ('failure' and $attrs->{'xmlns'} eq +NS_XMPP_SASL) 
+        {
+            $heap->debug_message('SASL Negotiation Failed');
+            $kernel->yield('shutdown');
+            $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+        } 
+        
+        when ('stream:features') 
+        {
+            given(my $clist = $node->getChildrenHash())
+            {
+                when ('starttls')
+                {
+                    my $starttls = XNode->new('starttls', ['xmlns', +NS_XMPP_TLS]);
+                    $kernel->yield('output_handler', $starttls, 1);
+                    $kernel->post($heap->events(), +PCJ_SSLNEGOTIATE);
+            
+                } 
+                
+                when('mechanisms') 
+                {
+                    $self->{'MECHANISMS'} = 1;
+                    foreach($clist->{'mechanisms'}->[0]->getChildrenByTagName('*'))
+                    {
+                        when($_->textContent() eq 'DIGEST-MD5' or $_->textContent() eq 'PLAIN')
+                        {
+                            $kernel->yield('set_auth', $_->textContent());
+                            $kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
+                            return;
+                        }
+                    }
+                
+                    $heap->debug_message('Unknown mechanism: '.$node->toString());
+                    $kernel->yield('shutdown');
+                    $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+            
+                } 
+                
+                when('bind') 
+                {
+            
+                    my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                    $iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
+                        ->appendChild('resource')
+                        ->appendText($config->{'resource'});
+                    
+                    $self->{'STARTSESSION'} = 1 if exists($clist->{'session'});
+                    $kernel->yield('return_to_sender', 'binding', $iq);
+                    $kernel->post($heap->events(), +PCJ_BINDNEGOTIATE);
+        
+                }
+                
+                default
+                {
+                    # If we get here, it means the server has decided TLS isn't 
+                    # necessary, or that it is a non-compliant server and has skipped
+                    # SASL negotition. Check for MECHANISMS flag. If it is present then
+                    # we are finished with connection initialization.
+                    #
+                    # See http://www.xmpp.org/rfcs/rfc3920.html for more info
+                    
+                    if($self->{'MECHANISMS'})
+                    {
+                        $heap->relinquish_states();
+                        $kernel->post(
+                            $heap->parent(),
+                            $heap->status(), 
+                            +PCJ_INIT_FINISHED);
+                    
+                    } else {
+
+                        $heap->debug_message('Non-compliant server implementation! '.
+                            'SASL negotiation not initiated.');
+                        $kernel->yield('shutdown');
+                        $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+                    }
+                }
+            }
+        } 
+        
+        when ('proceed') 
+        {
+            $kernel->yield('build_tls_wheel');
+        }
+        
+        when('success') 
+        {    
+            $kernel->yield('initiate_stream');
+            $kernel->post($heap->events(), +PCJ_AUTHSUCCESS);
+        }
+    }
+
+    return;	
 }
 
 sub binding()
@@ -239,65 +253,75 @@ sub binding()
 	my $attr = $node->getAttribute('type');
 
 	my $config = $heap->config();
+    
+    given($attr)
+    {
+        when(+IQ_RESULT)
+        {
+            if($self->{'STARTSESSION'})
+            {
+                my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                $iq->appendChild('session', ['xmlns', +NS_XMPP_SESSION]);
 
-	if($attr eq +IQ_RESULT)
-	{
-		if($self->{'STARTSESSION'})
-		{
-			my $iq = XNode->new('iq', ['type', +IQ_SET]);
-			$iq->appendChild('session', ['xmlns', +NS_XMPP_SESSION]);
-
-			$kernel->yield('return_to_sender', 'session_establish', $iq);
-			$kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
-			$kernel->post(
-				$heap->parent(),
-				$heap->status(),
-				+PCJ_SESSIONNEGOTIATE);
-		
-		} else {
-			
-			$heap->relinquish_states();
-			$kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
-			$kernel->post($heap->parent(),$heap->status(), +PCJ_INIT_FINISHED);
-		}
+                $kernel->yield('return_to_sender', 'session_establish', $iq);
+                $kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
+                $kernel->post(
+                    $heap->parent(),
+                    $heap->status(),
+                    +PCJ_SESSIONNEGOTIATE);
+            
+            } else {
+                
+                $heap->relinquish_states();
+                $kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
+                $kernel->post($heap->parent(),$heap->status(), +PCJ_INIT_FINISHED);
+            }
+            
+            $heap->jid($node->getSingleChildByTagName('bind')->getSingleChildByTagName('jid')->textContent());
         
-		$heap->jid($node->getSingleChildByTagName('bind')->getSingleChildByTagName('jid')->textContent());
-	
-	} elsif($attr eq +IQ_ERROR) {
+        }
+        
+        when(+IQ_ERROR) 
+        {
+            my $error = $node->getSingleChildByTagName('error');
+            my $type = $error->getAttribute('type');
 
-		my $error = $node->getSingleChildByTagName('error');
+            given($type)
+            {
+                when('modify')
+                {
+                    my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                    $iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
+                        ->appendChild('resource')
+                        ->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
+                    $kernel->yield('return_to_sender', 'binding', $iq);
+                
+                } 
+                when('cancel') 
+                {
+                    my $clist = $error->getChildrenHash();
+                    
+                    if(exists($clist->{'conflict'}))
+                    {
+                        my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                        $iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
+                            ->appendChild('resource')
+                            ->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
+                        $kernel->yield('return_to_sender', 'binding', $iq);
+                    
+                    } else {
+                    
+                        $heap->debug_message('Unable to BIND, yet binding required: '.
+                            $node->toString());
 
-		if($error->getAttribute('type') eq 'modify')
-		{
-			my $iq = XNode->new('iq', ['type', +IQ_SET]);
-			$iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
-				->appendChild('resource')
-				->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
-			$kernel->yield('return_to_sender', 'binding', $iq);
-		
-		} elsif($error->getAttribute('type') eq 'cancel') {
-
-			my $clist = $error->getChildrenHash();
-			
-			if(exists($clist->{'conflict'}))
-			{
-				my $iq = XNode->new('iq', ['type', +IQ_SET]);
-				$iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
-					->appendChild('resource')
-					->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
-				$kernel->yield('return_to_sender', 'binding', $iq);
-			
-			} else {
-			
-				$heap->debug_message('Unable to BIND, yet binding required: '.
-					$node->toString());
-
-				$kernel->yield('shutdown');
-				$kernel->post($heap->parent(), $heap->error(), +PCJ_BINDFAIL);
-			}
-			
-		}
-	}
+                        $kernel->yield('shutdown');
+                        $kernel->post($heap->events(), +PCJ_BINDFAIL);
+                    }
+                    
+                }
+            }
+        }
+    }
 	return;
 }
 		
@@ -309,19 +333,23 @@ sub session_establish()
 
 	my $config = $heap->config();
 	
-	if($attr eq +IQ_RESULT)
-	{
-		$heap->relinquish_states();
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_SESSIONSUCCESS);
-		$kernel->post($heap->parent(), $heap->status(),	+PCJ_INIT_FINISHED);
+    given($attr)
+    {
+        when(+IQ_RESULT)
+        {
+            $heap->relinquish_states();
+            $kernel->post($heap->events(), +PCJ_SESSIONSUCCESS);
+            $kernel->post($heap->events(),	+PCJ_INIT_FINISHED);
+        }
 
-	} elsif($attr eq +IQ_ERROR) {
-
-		$heap->debug_message('Unable to intiate SESSION, yet session required');
-		$heap->debug_message($node->toString());
-		$kernel->yield('shutdown');
-		$kernel->post($heap->parent(), $heap->error(), +PCJ_SESSIONFAIL);
-	}
+        when(+IQ_ERROR) 
+        {
+            $heap->debug_message('Unable to intiate SESSION, yet session required');
+            $heap->debug_message($node->toString());
+            $kernel->yield('shutdown');
+            $kernel->post($heap->events(), +PCJ_SESSIONFAIL);
+        }
+    }
 	return;
 }
 		
@@ -341,7 +369,7 @@ sub build_tls_wheel()
 		{
 			$heap->debug_message('Unable to negotiate SSL: '. $@);
 			$self->{'SSLTRIES'} = 0;
-			$kernel->post($heap->parent(), $heap->error(), +PCJ_SSLFAIL, $@);
+			$kernel->post($heap->events(), +PCJ_SSLFAIL, $@);
 		
 		} else {
 			
@@ -359,7 +387,7 @@ sub build_tls_wheel()
 			'FlushedEvent'	=> 'flushed',
 		));
 		$kernel->yield('initiate_stream');
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_SSLSUCCESS);
+		$kernel->post($heap->events(), +PCJ_SSLSUCCESS);
 	}
 	return;
 }

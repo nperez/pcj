@@ -4,9 +4,9 @@ const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
+use 5.010;
 use POE;
-use POE::Component::Jabber::Error;
-use POE::Component::Jabber::Status;
+use POE::Component::Jabber::Events;
 use POE::Filter::XML;
 use POE::Filter::XML::Node;
 use POE::Filter::XML::NS qw/ :JABBER :IQ /;
@@ -78,28 +78,37 @@ sub init_input_handler()
 		$heap->debug_message( "Recd: ".$node->toString() );
 	}
 	
-	if($node->nodeName() eq 'stream:stream')
-	{
-		$heap->sid($node->getAttribute('id'));
-		$kernel->yield('set_auth');
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHNEGOTIATE);
-	
-	} elsif($node->nodeName() eq 'iq') {
-	
-		if($node->getAttribute('type') eq +IQ_RESULT and $node->getAttribute('id') eq 'AUTH')
-		{
-			$heap->relinquish_states();
-			$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
-			$kernel->post($heap->parent(),$heap->status(),+PCJ_INIT_FINISHED);
-		
-		} elsif($node->getAttribute('type') eq +IQ_ERROR and 
-			$node->getAttribute('id') eq 'AUTH') {
+    given($node->nodeName())
+    {
+        when('stream:stream')
+        {
+            $heap->sid($node->getAttribute('id'));
+            $kernel->yield('set_auth');
+            $kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
+        
+        }
+        when('iq') 
+        {
+            given([$node->getAttribute('type'), $node->getAttribute('id')])
+            {
+                when([+IQ_RESULT, 'AUTH'])
+                {
+                    $heap->relinquish_states();
+                    $kernel->post($heap->events(), +PCJ_AUTHSUCCESS);
+                    $kernel->post($heap->events(), +PCJ_INIT_FINISHED);
+                
+                }
+                when([+IQ_ERROR, 'AUTH']) {
 
-			$heap->debug_message('Authentication Failed');
-			$kernel->yield('shutdown');
-			$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-		}
-	}
+                    $heap->debug_message('Authentication Failed');
+                    $kernel->yield('shutdown');
+                    $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+                }
+            }
+        }
+    }
+
+    return;
 }
 
 1;

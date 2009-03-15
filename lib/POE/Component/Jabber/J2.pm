@@ -4,10 +4,10 @@ const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
+use 5.010;
 use POE qw/ Wheel::ReadWrite /;
 use POE::Component::Jabber::Utility::SSLify qw/ Client_SSLify /;
-use POE::Component::Jabber::Error;
-use POE::Component::Jabber::Status;
+use POE::Component::Jabber::Events;
 use POE::Filter::XML;
 use POE::Filter::XML::Node;
 use POE::Filter::XML::NS qw/ :JABBER :IQ /;
@@ -130,94 +130,113 @@ sub init_input_handler()
 			$kernel->post($array->[0], $array->[1], $node);
 			return;
 		}
-	} elsif($node->nodeName() eq 'stream:stream') {
+	} 
+    given($node->nodeName())
+    {
+        when('stream:stream') 
+        {
+            $self->{'sid'} = $node->getAttribute('id');
 
-		$self->{'sid'} = $node->getAttribute('id');
+        } 
+        
+        when('challenge') 
+        {    
+            $kernel->yield('challenge_response', $node);
 
-	} elsif($node->nodeName() eq 'challenge') {
-		
-		$kernel->yield('challenge_response', $node);
+        }
+        
+        when('failure')
+        {
+            if($node->getAttribute('xmlns') eq +NS_XMPP_SASL)
+            {
+                $heap->debug_message('SASL Negotiation Failed');
+                $kernel->yield('shutdown');
+                $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+            }
+            else
+            {
+                $heap->debug_message('Unknown Failure: ' . $node->toString());
+            }
+        
+        }
+        
+        when('stream:features') 
+        {
+            given($node->getChildrenHash())
+            {
+                when('starttls')
+                {
+                    my $starttls = XNode->new('starttls', ['xmlns', +NS_XMPP_TLS]);
+                    $kernel->yield('output_handler', $starttls, 1);
+                    $kernel->post($heap->events(), +PCJ_SSLNEGOTIATE);
+                    $self->{'STARTTLS'} = 1;
+                
+                } 
+                when('mechanisms')
+                {    
+                    if(!defined($self->{'STARTTLS'}))
+                    {
+                        $kernel->post($heap->events(), +PCJ_SSLFAIL);
+                        $kernel->yield('shutdown');
+                        return;
+                    }
+                    
+                    foreach($_->{'mechanisms'}->[0]->getChildrenByTagName('*'))
+                    {
+                        when($_->textContent() eq 'DIGEST-MD5' or $_->textContent() eq 'PLAIN')
+                        {
+                            $kernel->yield('set_auth', $_->textContent());
+                            $kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
+                            return;
+                        }
+                    }
+                    
+                    $heap->debug_message('Unknown mechanism: '.$node->toString());
+                    $kernel->yield('shutdown');
+                    $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+                
+                } 
 
-	} elsif($node->nodeName() eq 'failure' and 
-		$node->getAttribute('xmlns') eq +NS_XMPP_SASL) {
+                when(sub() { !keys %$_; })
+                {
+                    if(!defined($self->{'STARTTLS'}))
+                    {
+                        $kernel->post($heap->events(), +PCJ_SSLFAIL);
+                        $kernel->yield('shutdown');
+                        return;
+                    }
 
-		$heap->debug_message('SASL Negotiation Failed');
-		$kernel->yield('shutdown');
-		$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-	
-	} elsif($node->nodeName() eq 'stream:features') {
+                    my $bind = XNode->new('bind' , ['xmlns', +NS_JABBER_COMPONENT])
+                        ->attr(
+                            'name', 
+                            $config->{'binddomain'} || 
+                            $config->{'username'} . '.' . $config->{'hostname'}
+                            );
+                    
+                    if(defined($config->{'bindoption'}))
+                    {
+                        $bind->appendChild($config->{'bindoption'});
+                    }
+                    
+                    $kernel->yield('return_to_sender', 'binding', $bind);
+                    $kernel->post($heap->events(), +PCJ_BINDNEGOTIATE);
+                }
+            }
 
-		my $clist = $node->getChildrenHash();
+        }
 
-		if(exists($clist->{'starttls'}))
-		{
-			my $starttls = XNode->new('starttls', ['xmlns', +NS_XMPP_TLS]);
-			$kernel->yield('output_handler', $starttls, 1);
-			$kernel->post($heap->parent(), $heap->status(), +PCJ_SSLNEGOTIATE);
-			$self->{'STARTTLS'} = 1;
-		
-		} elsif(exists($clist->{'mechanisms'})) {
-			
-			if(!defined($self->{'STARTTLS'}))
-			{
-				$kernel->post($heap->parent(), $heap->error(), +PCJ_SSLFAIL);
-				$kernel->yield('shutdown');
-				return;
-			}
+        when('proceed') 
+        {
+            $kernel->yield('build_tls_wheel');
+            $kernel->yield('initiate_stream');
+        } 
 
-			my $mechs = $clist->{'mechanisms'}->get_sort_children();
-			foreach my $mech (@$mechs)
-			{
-				if($mech->data() eq 'DIGEST-MD5')
-				{
-					$kernel->yield('set_auth', $mech->appendText());
-					$kernel->post(
-						$heap->parent(),
-						$heap->status(),
-						+PCJ_AUTHNEGOTIATE);
-					return;
-				}
-			}
-			
-			$heap->debug_message('Unknown mechanism: '.$node->toString());
-			$kernel->yield('shutdown');
-			$kernel->post($heap->parent(), $heap->error(), +PCJ_AUTHFAIL);
-		
-		} elsif(!keys %$clist) {
-			
-			if(!defined($self->{'STARTTLS'}))
-			{
-				$kernel->post($heap->parent(), $heap->error(), +PCJ_SSLFAIL);
-				$kernel->yield('shutdown');
-				return;
-			}
-
-			my $bind = XNode->new('bind' , ['xmlns', +NS_JABBER_COMPONENT])
-				->attr(
-					'name', 
-					$config->{'binddomain'} || 
-					$config->{'username'} . '.' . $config->{'hostname'}
-					);
-			
-			if(defined($config->{'bindoption'}))
-			{
-				$bind->appendChild($config->{'bindoption'});
-			}
-			
-			$kernel->yield('return_to_sender', 'binding', $bind);
-			$kernel->post($heap->parent(), $heap->status(), +PCJ_BINDNEGOTIATE);
-		}
-
-	} elsif($node->nodeName() eq 'proceed') {
-
-		$kernel->yield('build_tls_wheel');
-		$kernel->yield('initiate_stream');
-	
-	} elsif($node->nodeName() eq 'success') {
-
-		$kernel->yield('initiate_stream');
-		$kernel->post($heap->parent(), $heap->status(), +PCJ_AUTHSUCCESS);
-	}
+        when('success') 
+        {
+            $kernel->yield('initiate_stream');
+            $kernel->post($heap->events(), +PCJ_AUTHSUCCESS);
+        }
+    }
 
 	return;
 }
@@ -232,8 +251,8 @@ sub binding()
 	if(!$attr)
 	{
 		$heap->relinquish_states();
-		$kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
-		$kernel->post($heap->parent(),$heap->status(), +PCJ_INIT_FINISHED);
+		$kernel->post($heap->events(), +PCJ_BINDSUCCESS);
+		$kernel->post($heap->events(), +PCJ_INIT_FINISHED);
 		$heap->jid($config->{'binddomain'} ||
 			$config->{'username'} . '.' . $config->{'hostname'});
 	
@@ -242,7 +261,7 @@ sub binding()
 		$heap->debug_message('Unable to BIND, yet binding required: '.
 			$node->toString());
 		$kernel->yield('shutdown');
-		$kernel->post($heap->parent(), $heap->error(), +PCJ_BINDFAIL);
+		$kernel->post($heap->events(), +PCJ_BINDFAIL);
 	}
 }
 		
@@ -259,7 +278,7 @@ sub build_tls_wheel()
 		{
 			$heap->debug_message('Unable to negotiate SSL: '. $@);
 			$self->{'SSLTRIES'} = 0;
-			$kernel->post($heap->parent(), $heap->error(), +PCJ_SSLFAIL, $@);
+			$kernel->post($heap->events(), +PCJ_SSLFAIL, $@);
 
 		} else {
 
@@ -278,7 +297,7 @@ sub build_tls_wheel()
 		'ErrorEvent'	=> 'server_error',
 		'FlushedEvent'	=> 'flushed_event',
 	));
-	$kernel->post($heap->parent(), $heap->status(), +PCJ_SSLSUCCESS);
+	$kernel->post($heap->events(), +PCJ_SSLSUCCESS);
 
 	return;
 }

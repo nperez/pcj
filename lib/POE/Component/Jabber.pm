@@ -10,8 +10,7 @@ use POE::Wheel::SocketFactory;
 
 use POE::Component::PubSub;
 
-use POE::Component::Jabber::Error;
-use POE::Component::Jabber::Status;
+use POE::Component::Jabber::Events;
 use POE::Component::Jabber::ProtocolFactory;
 
 use POE::Filter::XML;
@@ -34,12 +33,13 @@ use constant
     '_pcj_shutdown'         =>  8,
     '_pcj_parent'           =>  9,
     '_pcj_input'            =>  10,
-    '_pcj_error'            =>  11,
-    '_pcj_status'           =>  12,
-    '_pcj_pending'          =>  13,
-    '_pcj_queue'            =>  14,
-    '_pcj_init_finished'    =>  15,
-    '_pcj_event'            =>  16,
+    '_pcj_events'           =>  11,
+    '_pcj_pending'          =>  12,
+    '_pcj_queue'            =>  13,
+    '_pcj_init_finished'    =>  14,
+    '_pcj_xpathfilters'     =>  15,
+    'EVENT'                 =>  0,
+    'EXPRESSION'            =>  1,
 
 };
 
@@ -115,6 +115,7 @@ sub new()
                 '_stop',
                 'purge_queue',
                 'debug_purge_queue',
+                'xpath_filter',
             ],
 
             $self =>
@@ -205,19 +206,6 @@ sub jid()
     }
 }
 
-sub parent()
-{
-    if(@_ > 1)
-    {
-        my ($self, $arg) = @_;
-        $self->[+_pcj_parent] = $arg;
-    
-    } else {
-
-        return shift(@_)->[+_pcj_parent];
-    }
-}
-
 sub input()
 {
     if(@_ > 1)
@@ -231,29 +219,16 @@ sub input()
     }
 }
 
-sub error()
+sub events()
 {
     if(@_ > 1)
     {
         my ($self, $arg) = @_;
-        $self->[+_pcj_error] = $arg;
-    
-    } else {
-
-        return shift(@_)->[+_pcj_error];
-    }
-}
-
-sub status()
-{
-    if(@_ > 1)
-    {
-        my ($self, $arg) = @_;
-        $self->[+_pcj_status] = $arg;
+        $self->[+_pcj_events] = $arg;
 
     } else {
 
-        return shift(@_)->[+_pcj_status];
+        return shift(@_)->[+_pcj_events];
     }
 }
 
@@ -336,9 +311,17 @@ sub _start()
     }
 
     $self->[+_pcj_queue] = [];
+    $self->[+_pcj_xpathfilters] = [];
     
-    my $pubsub = $self->[+_pcj_config]->{'events_alias'};
-
+    my $pubsub = $self->[+_pcj_events];
+    
+    $kernel->post($pubsub, 'publish', +PCJ_SOCKETFAIL);
+    $kernel->post($pubsub, 'publish', +PCJ_SOCKETDISCONNECT);
+    $kernel->post($pubsub, 'publish', +PCJ_AUTHFAIL);
+    $kernel->post($pubsub, 'publish', +PCJ_BINDFAIL);
+    $kernel->post($pubsub, 'publish', +PCJ_SESSIONFAIL);
+    $kernel->post($pubsub, 'publish', +PCJ_SSLFAIL);
+    $kernel->post($pubsub, 'publish', +PCJ_CONNECTFAIL);
     $kernel->post($pubsub, 'publish', +PCJ_CONNECT);
     $kernel->post($pubsub, 'publish', +PCJ_CONNECTING);
     $kernel->post($pubsub, 'publish', +PCJ_CONNECTED);
@@ -361,11 +344,15 @@ sub _start()
     $kernel->post($pubsub, 'publish', +PCJ_SHUTDOWN_START);
     $kernel->post($pubsub, 'publish', +PCJ_SHUTDOWN_FINISH);
     $kernel->post($pubsub, 'publish', +PCJ_RECONNECT);
+    $kernel->post($pubsub, 'publish', +PCJ_XPATHFILTER);
 
     $kernel->post($pubsub, 'publish', 'output', 
         +PUBLISH_INPUT, 'output_handler');
     $kernel->post($pubsub, 'publish', 'return_to_sender', 
         +PUBLISH_INPUT, 'return_to_sender');
+
+    $kernel->post($pubsub, 'publish', 'xpath_filter',
+        +PUBLISH_INPUT, 'xpath_filter');
 
     return;
 }
@@ -721,6 +708,25 @@ sub input_handler()
         }
     }
 
+    for(0..$#{$self->[+_pcj_xpathfilters]})
+    {
+        my $nodes = 
+        [
+            $node->findnodes($self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION])
+        ];
+
+        if(@$nodes)
+        {
+            $kernel->post
+            (
+                $self->[+_pcj_events], 
+                $self->[+_pcj_xpathfilters]->[$_]->[+EVENT],
+                $nodes,
+                $node
+            );
+        }
+    }
+
     $kernel->post($self->[+_pcj_events], +PCJ_NODERECEIVED, $node);
 
     return;
@@ -745,9 +751,69 @@ sub debug_input_handler()
         }
     }
     
+    for(0..$#{$self->[+_pcj_xpathfilters]})
+    {
+        my $nodes = 
+        [
+            $node->findnodes($self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION])
+        ];
+
+        if(@$nodes)
+        {
+            $self->debug_message('XPATH Match: '.$self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION]);
+            
+            for(0..$#{$nodes})
+            {
+                $self->debug_message('XPATH Matched Node: '.$nodes->[$_]);
+            }
+
+            $kernel->post
+            (
+                $self->[+_pcj_events], 
+                $self->[+_pcj_xpathfilters]->[$_]->[+EVENT],
+                $nodes,
+                $node
+            );
+        }
+    }
+    
     $kernel->post($self->[+_pcj_events], +PCJ_NODERECEIVED, $node);
     return;
 }
+
+sub xpath_filter()
+{
+    my($kernel, $self, $cmd, $event, $xpath) = 
+        @_[KERNEL, OBJECT, ARG0, ARG1, ARG2];
+
+    given(lc($cmd))
+    {
+        when('add')
+        {
+            push(@{$self->[+_pcj_xpathfilters]}, [$event, $xpath]);
+            
+            $kernel->post
+            (
+                $self->[+_pcj_events],
+                'publish',
+                $event
+            );
+        }
+
+        when('remove')
+        {
+            @{$self->[+_pcj_xpathfilters]} = grep { $_->[+EVENT] eq $event } @{$self->[+_pcj_xpathfilters]};
+            $kernel->post
+            (
+                $self->[+_pcj_events],
+                'recind',
+                $event
+            );
+        }
+    }
+}
+
+
 
 sub server_error()
 {
@@ -938,7 +1004,7 @@ configuration returned by config()).
 
 relinquish_states() is used by Protocol subclasses to return control of the
 events back to the core of PCJ. It is typically called when the event 
-PCJ_INIT_FINISH is fired to the status event handler.
+PCJ_INIT_FINISH is fired to the events handler.
 
 =head1 PUBLIC EVENTS
 
