@@ -11,8 +11,7 @@ use POE;
 BEGIN 
 { 
 	use_ok('PCJx');
-	use_ok('PCJx::Error');
-	use_ok('PCJx::Status');
+	use_ok('PCJx::Events');
 	use_ok('PCJx::ProtocolFactory');
 }
 
@@ -32,17 +31,14 @@ sub test_new_pcj_succeed
 
 # Lets start by testing constants
 
-can_ok('PCJx::Error', 
-	qw/PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL PCJ_BINDFAIL 
-	PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL/);
-
-can_ok('PCJx::Status',
-	qw/ PCJ_CONNECT PCJ_CONNECTING PCJ_CONNECTED PCJ_STREAMSTART
-	PCJ_SSLNEGOTIATE PCJ_SSLSUCCESS PCJ_AUTHNEGOTIATE PCJ_AUTHSUCCESS
-	PCJ_BINDNEGOTIATE PCJ_BINDSUCCESS PCJ_SESSIONNEGOTIATE PCJ_SESSIONSUCCESS
-	PCJ_RECONNECT PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START
-	PCJ_RTS_FINISH PCJ_INIT_FINISHED PCJ_STREAMEND PCJ_SHUTDOWN_START
-	PCJ_SHUTDOWN_FINISH /);
+can_ok('PCJx::Events', 
+    qw/ PCJ_CONNECT PCJ_CONNECTING PCJ_CONNECTED PCJ_STREAMSTART
+    PCJ_SSLNEGOTIATE PCJ_SSLSUCCESS PCJ_AUTHNEGOTIATE PCJ_AUTHSUCCESS
+    PCJ_BINDNEGOTIATE PCJ_BINDSUCCESS PCJ_SESSIONNEGOTIATE PCJ_SESSIONSUCCESS
+    PCJ_RECONNECT PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START
+    PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START PCJ_INIT_FINISHED
+    PCJ_SHUTDOWN_FINISH PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL
+    PCJ_BINDFAIL PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL/);
 
 can_ok('PCJx::ProtocolFactory',
 	qw/ JABBERD14_COMPONENT JABBERD20_COMPONENT LEGACY XMPP /);
@@ -72,17 +68,9 @@ my $config =
 	Username => 'PCJTester',
 	Password => 'PCJTester',
 	ConnectionType => +XMPP,
-	States => {
-		StatusEvent => 'status_event',
-		InputEvent => 'input_event',
-		ErrorEvent => 'error_event',
-	}
 };
 
 my $scratch_space = {};
-
-
-test_new_pcj_fail('No current session', %{$config});
 
 POE::Session->create
 (
@@ -95,7 +83,8 @@ POE::Session->create
 				$_[KERNEL]->yield('continue');
 				$_[HEAP] = $config;
 			},
-		'continue' =>
+		
+        'continue' =>
 			sub
 			{
 				test_new_pcj_fail('No arguments');
@@ -108,22 +97,63 @@ POE::Session->create
 					test_new_pcj_fail('No ' . $key, %hash);
 				}
 
-				my %hash = %{$_[HEAP]};
-				$hash{'ConnectionType'} = 12983;
-				test_new_pcj_fail('Invalid ConnectionType', %hash);
+                $_[HEAP]->{'Alias'} = 'PCJ_TESTER';
+				$_[HEAP]->{'ConnectionType'} = 12983;
 				
-				test_new_pcj_succeed('Correct construction XMPP', %{$_[HEAP]});
+                test_new_pcj_fail('Invalid ConnectionType', %{$_[HEAP]});
 
-				$hash{'ConnectionType'} = +LEGACY;
-				test_new_pcj_succeed('Correct construction LEGACY', %hash);
+                $_[KERNEL]->yield('xmpp');
+            },
+        
+        'xmpp'  =>
+            sub
+            {	
+				$_[HEAP]->{'ConnectionType'} = +XMPP;
+                test_new_pcj_succeed('Correct construction XMPP', %{$_[HEAP]});
+                $_[KERNEL]->call('PCJ_TESTER', 'destroy');
 
-				$hash{'ConnectionType'} = +JABBERD14_COMPONENT;
-				test_new_pcj_succeed('Correct construction J14', %hash);
+                $_[KERNEL]->yield('legacy');
+            },
 
-				$hash{'ConnectionType'} = +JABBERD20_COMPONENT;
-				test_new_pcj_succeed('Correct construction J2', %hash);
+        'legacy' =>
+            sub
+            {   
+                ok(!$_[KERNEL]->post('PCJ_TESTER'), 'XMPP component destroyed');
+				$_[HEAP]->{'ConnectionType'} = +LEGACY;
+				test_new_pcj_succeed('Correct construction LEGACY', %{$_[HEAP]});
+                $_[KERNEL]->call('PCJ_TESTER', 'destroy');
+
+                $_[KERNEL]->yield('j14');
+            },
+
+        'j14'   =>
+            sub
+            {   
+                ok(!$_[KERNEL]->post('PCJ_TESTER'), 'LEGACY component destroyed');
+				$_[HEAP]->{'ConnectionType'} = +JABBERD14_COMPONENT;
+				test_new_pcj_succeed('Correct construction J14', %{$_[HEAP]});
+                $_[KERNEL]->call('PCJ_TESTER', 'destroy');
+
+                $_[KERNEL]->yield('j20');
+            },
+
+        'j20'   =>
+            sub
+            {
+                ok(!$_[KERNEL]->post('PCJ_TESTER'), 'J14 component destroyed');
+				$_[HEAP]->{'ConnectionType'} = +JABBERD20_COMPONENT;
+				test_new_pcj_succeed('Correct construction J2', %{$_[HEAP]});
+                $_[KERNEL]->call('PCJ_TESTER', 'destroy');
+
+                $_[KERNEL]->yield('destroyed');
 				
 			},
+
+        'destroyed' =>
+            sub
+            {
+                ok(!$_[KERNEL]->post('PCJ_TESTER'), 'J20 component destroyed');
+            },
 	}
 );
 

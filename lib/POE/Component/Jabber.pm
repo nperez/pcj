@@ -4,6 +4,7 @@ const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
+use 5.010;
 use POE;
 use POE::Wheel::ReadWrite;
 use POE::Wheel::SocketFactory;
@@ -69,7 +70,6 @@ sub new()
     $args->{'version'}      ||= $self->[+_pcj_helper]->get_version();
     $args->{'xmlns'}        ||= $self->[+_pcj_helper]->get_xmlns();
     $args->{'alias'}        ||= 'POE_COMPONENT_JABBER';
-    $args->{'events_alias'} ||= 'EVENTS_ALIAS';
     $args->{'stream'}       ||= +XMLNS_STREAM;
     $args->{'debug'}        ||= 0 ;
     $args->{'resource'}     ||= md5_hex(time().rand().$$.rand().$^T.rand());
@@ -89,7 +89,7 @@ sub new()
     Carp::confess "$me requires Port to be defined" if not defined
         $args->{'port'};
     
-    POE::Component::PubSub->new($args->{'events_alias'});
+    POE::Component::PubSub->new($args->{'alias'});
 
     POE::Session->create
     (
@@ -301,7 +301,7 @@ sub connect_error()
 sub _start()
 {    
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    $kernel->alias_set($self->[+_pcj_config]->{'alias'});
+    $kernel->alias_set($self->[+_pcj_config]->{'alias'} . 'CORE');
     $self->_reset();
 
     if($self->[+_pcj_config]->{'debug'})
@@ -325,7 +325,6 @@ sub _start()
     $kernel->post($pubsub, 'publish', +PCJ_CONNECT);
     $kernel->post($pubsub, 'publish', +PCJ_CONNECTING);
     $kernel->post($pubsub, 'publish', +PCJ_CONNECTED);
-    $kernel->post($pubsub, 'publish', +PCJ_STEAMSTART);
     $kernel->post($pubsub, 'publish', +PCJ_SSLNEGOTIATE);
     $kernel->post($pubsub, 'publish', +PCJ_SSLSUCCESS);
     $kernel->post($pubsub, 'publish', +PCJ_AUTHNEGOTIATE);
@@ -339,8 +338,8 @@ sub _start()
     $kernel->post($pubsub, 'publish', +PCJ_RTS_START);
     $kernel->post($pubsub, 'publish', +PCJ_RTS_FINISH);
     $kernel->post($pubsub, 'publish', +PCJ_READY);
-    $kernel->post($pubsub, 'publish', +PCJ_STEAMEND);
-    $kernel->post($pubsub, 'publish', +PCJ_STEAMSTART);
+    $kernel->post($pubsub, 'publish', +PCJ_STREAMEND);
+    $kernel->post($pubsub, 'publish', +PCJ_STREAMSTART);
     $kernel->post($pubsub, 'publish', +PCJ_SHUTDOWN_START);
     $kernel->post($pubsub, 'publish', +PCJ_SHUTDOWN_FINISH);
     $kernel->post($pubsub, 'publish', +PCJ_RECONNECT);
@@ -348,12 +347,27 @@ sub _start()
 
     $kernel->post($pubsub, 'publish', 'output', 
         +PUBLISH_INPUT, 'output_handler');
+
     $kernel->post($pubsub, 'publish', 'return_to_sender', 
         +PUBLISH_INPUT, 'return_to_sender');
 
     $kernel->post($pubsub, 'publish', 'xpath_filter',
         +PUBLISH_INPUT, 'xpath_filter');
 
+    $kernel->post($pubsub, 'publish', 'shutdown',
+        +PUBLISH_INPUT, 'shutdown');
+
+    $kernel->post($pubsub, 'publish', 'connect',
+        +PUBLISH_INPUT, 'publish', 'connect');
+
+    $kernel->post($pubsub, 'publish', 'reconnect',
+        +PUBLISH_INPUT, 'publish', 'reconnect');
+
+    $kernel->post($pubsub, 'publish', 'purge_queue',
+        +PUBLISH_INPUT, 'publish', 'purge_queue');
+
+    $kernel->post($pubsub, 'publish', 'destroy',
+        +PUBLISH_INPUT, 'publish', 'destroy');
     return;
 }
 
@@ -361,6 +375,21 @@ sub _stop()
 {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
     $kernel->alias_remove($_) for $kernel->alias_list();
+    
+    return;
+}
+
+sub destroy()
+{
+    my ($kernel, $self) = @_[KERNEL, OBJECT];
+    
+    $self->[+_pcj_wheel] = undef;
+    $self->[+_pcj_sfwheel] = undef;
+    $self->[+_pcj_sock]->close() if defined($self->[+_pcj_sock]);
+    $self->[+_pcj_sock] = undef;
+    $kernel->call($self->[+_pcj_events], 'destroy');
+    $kernel->alias_remove($_) for $kernel->alias_list();
+
     return;
 }
 
@@ -568,16 +597,18 @@ sub shutdown()
 {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
 
-    my $node = XNode->new('stream:stream');
-    $node->stream_end(1);
-    
-    $self->[+_pcj_shutdown] = 1;
+    if(defined($self->[+_pcj_wheel]))
+    {
+        my $node = XNode->new('stream:stream');
+        $node->stream_end(1);
+        
+        $self->[+_pcj_shutdown] = 1;
 
-    $self->[+_pcj_wheel]->put($node);
+        $self->[+_pcj_wheel]->put($node);
 
-    $kernel->post($self->[+_pcj_events], +PCJ_STREAMEND);
-    $kernel->post($self->[+_pcj_events], +PCJ_SHUTDOWN_START);
-    
+        $kernel->post($self->[+_pcj_events], +PCJ_STREAMEND);
+        $kernel->post($self->[+_pcj_events], +PCJ_SHUTDOWN_START);
+    }
     return;
 }
 
@@ -783,10 +814,10 @@ sub debug_input_handler()
 
 sub xpath_filter()
 {
-    my($kernel, $self, $cmd, $event, $xpath) = 
+    my ($kernel, $self, $cmd, $event, $xpath) = 
         @_[KERNEL, OBJECT, ARG0, ARG1, ARG2];
 
-    given(lc($cmd))
+    given($cmd)
     {
         when('add')
         {
@@ -812,8 +843,6 @@ sub xpath_filter()
         }
     }
 }
-
-
 
 sub server_error()
 {
