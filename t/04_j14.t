@@ -1,17 +1,12 @@
 #!/usr/bin/perl
-use Filter::Template;
-const PCJx POE::Component::Jabber
-
 use warnings;
 use strict;
 
-use Test::More tests => 12;
+use 5.010;
+use Test::More tests => 11;
 use IO::File;
 use POE;
-use PCJx;
-use PCJx::Error;
-use PCJx::Status;
-use PCJx::ProtocolFactory;
+use POE::Component::Jabber;
 
 my $file;
 if(-e 'run_network_tests')
@@ -20,7 +15,7 @@ if(-e 'run_network_tests')
 
 } else {
 
-	SKIP: { skip('Network tests were declined', 12); }
+	SKIP: { skip('Network tests were declined', 11); }
 	exit 0;
 }
 
@@ -29,7 +24,7 @@ my $file_config = {};
 my @lines = $file->getlines();
 if(!@lines)
 {
-	SKIP: { skip('Component tests were declined', 12); }
+	SKIP: { skip('Component tests were declined', 11); }
 	exit 0;
 }
 
@@ -63,14 +58,10 @@ my $config =
 	IP => $file_config->{'jabberd14'}->{'ip'},
 	Port => $file_config->{'jabberd14'}->{'port'},
 	Hostname => $file_config->{'jabberd14'}->{'host'},
-	Username => $file_config->{'jabberd14'}->{'user'},
+	Username => 'jabberd',
 	Password => $file_config->{'jabberd14'}->{'secret'},
 	ConnectionType => +JABBERD14_COMPONENT,
-	States => {
-		StatusEvent => 'status_event',
-		InputEvent => 'input_event',
-		ErrorEvent => 'error_event',
-	}
+    debug => 0,
 };
 
 my $scratch_space = {};
@@ -82,122 +73,166 @@ POE::Session->create
 		'_start' =>
 			sub
 			{
-				$_[KERNEL]->alias_set('j14_testing');
+				$_[KERNEL]->alias_set('xmpp_testing');
+				$config->{'Alias'} = 'pcj';
+				$_[HEAP]->{'pcj'} = POE::Component::Jabber->new(%$config);
 				$_[KERNEL]->yield('continue');
 			},
 		'continue' =>
 			sub
 			{
-				$config->{'Alias'} = 'pcj';
-				$_[HEAP]->{'pcj'} = PCJx->new(%$config);
-				$_[KERNEL]->post('pcj', 'connect');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_CONNECT, 'pcj_connect');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_CONNECTING, 'pcj_connecting');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_CONNECTED, 'pcj_connected');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_CONNECTFAIL, 'pcj_connectfail');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_STREAMSTART, 'pcj_streamstart');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_STREAMEND, 'pcj_streamend');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_AUTHNEGOTIATE, 'pcj_authnegotiate');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_AUTHSUCCESS, 'pcj_authsuccess');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_AUTHFAIL, 'pcj_authfail');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_READY, 'pcj_ready');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_SHUTDOWN_START, 'pcj_shutdown_start');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_SHUTDOWN_FINISH, 'pcj_shutdown_finish');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_SOCKETFAIL, 'pcj_socketfail');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_SOCKETDISCONNECT, 'pcj_socketdisconnect');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_NODERECEIVED, 'pcj_nodereceived');
+                $_[KERNEL]->post('pcj', 'subscribe', +PCJ_NODESENT, 'pcj_nodesent');
 				
-			},
-		'status_event' =>
-			sub
-			{
-				my ($kernel, $sender, $status) = @_[KERNEL, SENDER, ARG0];
-
-				if($status == +PCJ_CONNECT)
+				if(-e 'run_network_tests')
 				{
-					pass('Connect started');
-
-				} elsif($status == +PCJ_CONNECTING) {
-
-					pass('Connecting in progress');
-
-				} elsif($status == +PCJ_CONNECTED) {
-
-					pass('Connect finished');
-
-				} elsif($status == +PCJ_STREAMSTART) {
-
-					pass('Stream start');
+					$_[KERNEL]->post('pcj', 'connect');
 				
-				} elsif($status == +PCJ_AUTHNEGOTIATE) {
-
-					pass('Start handshake negotiation');
-
-				} elsif($status == +PCJ_AUTHSUCCESS) {
-
-					pass('handshake negotiation success');
-
-				} elsif($status == +PCJ_INIT_FINISHED) {
+				} else {
 					
-					pass('PCJ initialization complete');
-
-					$_[KERNEL]->post('pcj', 'shutdown');
-				
-				} elsif($status == +PCJ_STREAMEND) {
-
-					$scratch_space->{'STEAMEND'} = 1;
-					pass('Stream end sent');
-
-				} elsif($status == +PCJ_SHUTDOWN_START) {
-					
-					if(!defined($scratch_space->{'STEAMEND'}))
-					{
-						fail('A stream end was not sent to the server!');
-					
-					} else {
-
-						$scratch_space->{'SHUTDOWNSTART'} = 1;
-						pass('Shutdown in progress');
-					}
-				
-				} elsif($status == +PCJ_SHUTDOWN_FINISH) {
-
-					if(!defined($scratch_space->{'SHUTDOWNSTART'}))
-					{
-						fail('Shutdown start was never called');
-					
-					} else {
-
-						pass('Shutdown complete');
-					}
+					SKIP: { skip('Network tests were declined', 11); }
+					exit 0;
 				}
 			},
-
-		'error_event' =>
-			sub
-			{
-				my $error = $_[ARG0];
-
-				if($error == +PCJ_SOCKETFAIL)
-				{
-					if(!defined($scratch_space->{'STEAMEND'}))
-					{
-						BAIL_OUT('There was a socket failure during testing');
-					
-					} else {
-
-						pass('Socket read error at end of stream okay');
-					}
-				
-				} elsif($error == +PCJ_SOCKETDISCONNECT) {
-					
-					if(!defined($scratch_space->{'SHUTDOWNSTART'}))
-					{
-						BAIL_OUT('We were disconnected during testing');
-					
-					} else {
-
-						pass('Disconnected called at the right time');
-					}
-
-				} elsif($error == +PCJ_AUTHFAIL) {
-
-					BAIL_OUT('Authentication failed for some reason. ' .
-						'Please check the username and password in this test '.
-						'to make sure it is correct.');
-				
-				} elsif($error == +PCJ_CONNECTFAIL) {
-
-					BAIL_OUT(q|We couldn't connect to the server. Check your |.
-						'network connection or rerun Build.PL and say "N" to '.
-						'network enabled tests');
-				}
+        'pcj_nodesent' =>
+            sub
+            {   
+                my ($kernel, $arg) = @_[KERNEL, ARG0];
+                if($config->{'debug'})
+                {
+                    say $arg->toString();
+                }
+            },
+        'pcj_nodereceived' =>
+            sub
+            {
+                my ($kernel, $arg) = @_[KERNEL, ARG0];
+                if($config->{'debug'})
+                {
+                    say $arg->toString();
+                }
+            },
+        'pcj_connect' =>
+            sub
+            {
+                pass('Connect started');
+            },
+        'pcj_connecting' =>
+            sub
+            {
+                pass('Connecting');
+            },
+        'pcj_connected' =>
+            sub
+            {
+                pass('Connection sucessful');
+            },
+        'pcj_connectfail' =>
+            sub
+            {
+                BAIL_OUT(q|We couldn't connect to the server. Check your |.
+                    'network connection or rerun Build.PL and say "N" to '.
+                    'network enabled tests');
+            },
+        'pcj_streamstart' =>
+            sub
+            {
+                pass('Stream initated');
+            },
+        'pcj_streamend' =>
+            sub
+            {
+                $scratch_space->{'STEAMEND'} = 1;
+                pass('Stream end sent');
+            },
+	    'pcj_authnegotiate' =>
+            sub
+            {
+                pass('Negotiating authentication');
+            },
+        'pcj_authsuccess' =>
+            sub
+            {
+                pass('Authentication sucessfully negotiated');
+            },
+        'pcj_authfail' =>
+            sub
+            {
+                BAIL_OUT('Authentication failed for some reason. ' .
+                    'Please check the username and password in this test '.
+                    'to make sure it is correct.');
+            },
+        'pcj_ready' =>
+            sub
+            {
+                $_[KERNEL]->post('pcj', 'shutdown');
 			},
+        
+        'pcj_shutdown_start' =>
+            sub
+            {
+                if(!defined($scratch_space->{'STEAMEND'}))
+                {
+                    fail('A stream end was not sent to the server!');
+                
+                } else {
+
+                    $scratch_space->{'SHUTDOWNSTART'} = 1;
+                    pass('Shutdown in progress');
+                }
+            },
+
+        'pcj_shutdown_finish' =>
+            sub
+            {
+                if(!defined($scratch_space->{'SHUTDOWNSTART'}))
+                {
+                    fail('Shutdown start was never called');
+                
+                } else {
+
+                    pass('Shutdown complete');
+                }
+			},
+
+        'pcj_socketfail' =>
+            sub
+            {
+                if(!defined($scratch_space->{'STEAMEND'}))
+                {
+                    BAIL_OUT('There was a socket failure during testing');
+                
+                } else {
+
+                    pass('Socket read error at end of stream okay');
+                }
+            },
+        'pcj_socketdisconnect' =>
+            sub
+            {
+                if(!defined($scratch_space->{'SHUTDOWNSTART'}))
+                {
+                    BAIL_OUT('We were disconnected during testing');
+                
+                } else {
+
+                    pass('Disconnected called at the right time');
+                }
+            },
 	}
 );
 

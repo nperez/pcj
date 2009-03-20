@@ -1,6 +1,4 @@
 package POE::Component::Jabber::J14;
-use Filter::Template;
-const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
@@ -40,7 +38,7 @@ sub set_auth()
 {
 	my ($kernel, $heap, $self) = @_[KERNEL, HEAP, OBJECT];
 
-	my $node = XNode->new('handshake');
+	my $node = POE::Filter::XML::Node->new('handshake');
 	my $config = $heap->config();
 	$node->appendText(sha1_hex($self->{'sid'}.$config->{'password'}));
 	$kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
@@ -58,7 +56,7 @@ sub init_input_handler()
         {	
             my $config = $heap->config();
             $kernel->post($heap->events(), +PCJ_AUTHSUCCESS);
-            $kernel->post($heap->events(), +PCJ_INIT_FINISHED);
+            $kernel->post($heap->events(), +PCJ_READY);
             $heap->jid($config->{'hostname'});
             $heap->relinquish_states();
 
@@ -66,7 +64,7 @@ sub init_input_handler()
         
         when('stream:stream')
         {
-            $self->{'sid'} = $node->attr('id');
+            $self->{'sid'} = $node->getAttribute('id');
             $kernel->yield('set_auth');
         
         }

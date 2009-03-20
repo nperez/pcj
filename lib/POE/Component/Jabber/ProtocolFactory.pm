@@ -16,10 +16,10 @@ use constant
 	'XMPP'					=> 4,
 };
 
-require Exporter;
-our $VERSION = '3.00';
-our @ISA = qw/ Exporter /;
+use base('Exporter');
 our @EXPORT = qw/ JABBERD14_COMPONENT JABBERD20_COMPONENT LEGACY XMPP /;
+
+our $VERSION = '3.00';
 
 sub get_guts($)
 {

@@ -20,8 +20,7 @@ my @comps = ($j14, $j20);
 my $prompt_ip = 'Please enter the ip address of the server.';
 my $prompt_port = 'Please enter the listening port on the server.';
 my $prompt_hostname = 'Please enter the hostname the component will represent.';
-my $prompt_username = qq|Please enter the username the component will represent. \n| .
-	qq|(NOTE: only valid for JABBERD20)|;
+my $prompt_username = qq|Please enter the username the component will represent.|;
 my $prompt_secret = 'Please enter the secret that will be used to auth.';
 my $ret;
 
@@ -39,22 +38,23 @@ if($ret =~ /^y/i)
 	open(my $file, '>', 'run_network_tests');
 	$ret = Module::Build->prompt($prompt_components, 'n');
 	
-	
-	if($ret =~ /^y/i)
-	{	
-		foreach my $comp (@comps)
-		{
-			print "\n" . $comp;
-			print $file $comp;
-			print $file 'IP=' . Module::Build->prompt($prompt_ip, '127.0.0.1') . "\n";
-			print $file 'PORT=' . Module::Build->prompt($prompt_port, '5234') . "\n";
-			print $file 'HOST=' . Module::Build->prompt($prompt_hostname, 'component.localhost') . "\n";
-			print $file 'USER=' . Module::Build->prompt($prompt_username, 'jabberd') . "\n";
-			print $file 'SECRET=' . Module::Build->prompt($prompt_secret, 'secret') . "\n";
-		}
+    if($ret =~ /^y/i)
+    {
+        print "\n" . qq|### JABBERD14 ###\n|;
+        print $file qq|### JABBERD14 ###\n|; 
+        print $file 'IP=' . Module::Build->prompt($prompt_ip, '127.0.0.1') . "\n";
+        print $file 'PORT=' . Module::Build->prompt($prompt_port, '5348') . "\n";
+        print $file 'HOST=' . Module::Build->prompt($prompt_hostname, 'component.localhost') . "\n";
+        print $file 'SECRET=' . Module::Build->prompt($prompt_secret, 'secret') . "\n";
 
-	}
-
+        print "\n" . qq|### JABBERD20 ###\n|;
+        print $file qq|### JABBERD20 ###\n|; 
+        print $file 'IP=' . Module::Build->prompt($prompt_ip, '127.0.0.1') . "\n";
+        print $file 'PORT=' . Module::Build->prompt($prompt_port, '5347') . "\n";
+        print $file 'HOST=' . Module::Build->prompt($prompt_hostname, 'component.localhost') . "\n";
+        print $file 'USER=' . Module::Build->prompt($prompt_username, 'jabberd') . "\n";
+        print $file 'SECRET=' . Module::Build->prompt($prompt_secret, 'secret') . "\n";
+    }
 	close($file);
 
 } else {
@@ -73,12 +73,11 @@ Module::Build->new
 	{
 		'perl'	=>	'5.10.0',
 		'POE'	=>	'1.003',
-		'Filter::Template' => '1.02',
 		'Digest::SHA1' => '2.11',
 		'Authen::SASL' => '2.12',
-		'MIME::Base64' => '3.07',
-#		'POE::Component::SSLify' => '0.06',
+		'MIME::Base64' => '3.07_01',
 		'POE::Filter::XML' => '0.35',
-        'Net::SSLeay' => '1.35',
+        'POE::Component::SSLify' => '0.15',
+
 	}
 )->create_build_script();

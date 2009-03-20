@@ -1,7 +1,4 @@
 #!/usr/bin/perl
-use Filter::Template;
-const PCJx POE::Component::Jabber
-
 use warnings;
 use strict;
 
@@ -10,53 +7,53 @@ use POE;
 
 BEGIN 
 { 
-	use_ok('PCJx');
-	use_ok('PCJx::Events');
-	use_ok('PCJx::ProtocolFactory');
+	use_ok('POE::Component::Jabber');
+	use_ok('POE::Component::Jabber::Events');
+	use_ok('POE::Component::Jabber::ProtocolFactory');
 }
 
 sub test_new_pcj_fail
 {
 	my ($name, @args) = @_;
-	eval { PCJx->new(@args); };
+	eval { POE::Component::Jabber->new(@args); };
 	ok($@ ne '', $name);
 }
 
 sub test_new_pcj_succeed
 {
 	my ($name, @args) = @_;
-	eval { PCJx->new(@args); };
+	eval { POE::Component::Jabber->new(@args); };
 	ok($@ eq '', $name);
 }
 
 # Lets start by testing constants
 
-can_ok('PCJx::Events', 
+can_ok('POE::Component::Jabber::Events', 
     qw/ PCJ_CONNECT PCJ_CONNECTING PCJ_CONNECTED PCJ_STREAMSTART
     PCJ_SSLNEGOTIATE PCJ_SSLSUCCESS PCJ_AUTHNEGOTIATE PCJ_AUTHSUCCESS
     PCJ_BINDNEGOTIATE PCJ_BINDSUCCESS PCJ_SESSIONNEGOTIATE PCJ_SESSIONSUCCESS
     PCJ_RECONNECT PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START
-    PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START PCJ_INIT_FINISHED
+    PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START
     PCJ_SHUTDOWN_FINISH PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL
     PCJ_BINDFAIL PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL/);
 
-can_ok('PCJx::ProtocolFactory',
+can_ok('POE::Component::Jabber::ProtocolFactory',
 	qw/ JABBERD14_COMPONENT JABBERD20_COMPONENT LEGACY XMPP /);
 
 #now lets test ProtocolFactory
 
-my $guts = PCJx::ProtocolFactory::get_guts(+XMPP);
-isa_ok($guts, 'PCJx::XMPP');
-isa_ok($guts, 'PCJx::Protocol');
-$guts = PCJx::ProtocolFactory::get_guts(+LEGACY);
-isa_ok($guts, 'PCJx::Legacy');
-isa_ok($guts, 'PCJx::Protocol');
-$guts = PCJx::ProtocolFactory::get_guts(+JABBERD14_COMPONENT);
-isa_ok($guts, 'PCJx::J14');
-isa_ok($guts, 'PCJx::Protocol');
-$guts = PCJx::ProtocolFactory::get_guts(+JABBERD20_COMPONENT);
-isa_ok($guts, 'PCJx::J2');
-isa_ok($guts, 'PCJx::Protocol');
+my $guts = POE::Component::Jabber::ProtocolFactory::get_guts(+XMPP);
+isa_ok($guts, 'POE::Component::Jabber::XMPP');
+isa_ok($guts, 'POE::Component::Jabber::Protocol');
+$guts = POE::Component::Jabber::ProtocolFactory::get_guts(+LEGACY);
+isa_ok($guts, 'POE::Component::Jabber::Legacy');
+isa_ok($guts, 'POE::Component::Jabber::Protocol');
+$guts = POE::Component::Jabber::ProtocolFactory::get_guts(+JABBERD14_COMPONENT);
+isa_ok($guts, 'POE::Component::Jabber::J14');
+isa_ok($guts, 'POE::Component::Jabber::Protocol');
+$guts = POE::Component::Jabber::ProtocolFactory::get_guts(+JABBERD20_COMPONENT);
+isa_ok($guts, 'POE::Component::Jabber::J2');
+isa_ok($guts, 'POE::Component::Jabber::Protocol');
 
 #now lets test constructing PCJ
 

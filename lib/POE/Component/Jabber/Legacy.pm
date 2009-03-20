@@ -1,6 +1,4 @@
 package POE::Component::Jabber::Legacy;
-use Filter::Template;
-const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
@@ -41,7 +39,7 @@ sub set_auth()
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
 	
 	my $config = $heap->config();
-	my $node = XNode->new('iq', ['type', +IQ_SET, 'id', 'AUTH']);
+	my $node = POE::Filter::XML::Node->new('iq', ['type', +IQ_SET, 'id', 'AUTH']);
 	my $query = $node->appendChild('query', ['xmlns', +NS_JABBER_AUTH]);
 
 	$query->appendChild('username')->appendText($config->{'username'});
@@ -95,7 +93,7 @@ sub init_input_handler()
                 {
                     $heap->relinquish_states();
                     $kernel->post($heap->events(), +PCJ_AUTHSUCCESS);
-                    $kernel->post($heap->events(), +PCJ_INIT_FINISHED);
+                    $kernel->post($heap->events(), +PCJ_READY);
                 
                 }
                 when([+IQ_ERROR, 'AUTH']) {

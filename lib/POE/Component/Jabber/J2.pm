@@ -1,12 +1,10 @@
 package POE::Component::Jabber::J2;
-use Filter::Template;
-const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
 use 5.010;
 use POE qw/ Wheel::ReadWrite /;
-use POE::Component::Jabber::Utility::SSLify qw/ Client_SSLify /;
+use POE::Component::SSLify qw/ Client_SSLify /;
 use POE::Component::Jabber::Events;
 use POE::Filter::XML;
 use POE::Filter::XML::Node;
@@ -65,7 +63,7 @@ sub set_auth()
 
 	$self->{'challenge'} = $sasl;
 
-	my $node = XNode->new('auth',
+	my $node = POE::Filter::XML::Node->new('auth',
 	['xmlns', +NS_XMPP_SASL, 'mechanism', $mech]);
 
 	$kernel->yield('output_handler', $node, 1);
@@ -90,7 +88,7 @@ sub challenge_response()
 	my $conn = $sasl->client_new("xmpp", $config->{'hostname'});
 	$conn->client_start();
 
-	my $step = $conn->client_step(decode_base64($node->appendText()));
+	my $step = $conn->client_step(decode_base64($node->textContent()));
 
 	if ($config->{'debug'}) {
 		$heap->debug_message("Decoded Response:\n$step");
@@ -103,8 +101,8 @@ sub challenge_response()
 		$step =~ s/\s+//go;
 	}
 
-	my $response = XNode->new('response', ['xmlns', +NS_XMPP_SASL]);
-	$response->appendText($step);
+	my $response = POE::Filter::XML::Node->new('response', ['xmlns', +NS_XMPP_SASL]);
+	$response->appendText($step) if defined($step);
 
 	$kernel->yield('output_handler', $response, 1);
 }
@@ -113,7 +111,7 @@ sub init_input_handler()
 {
 	my ($kernel, $heap, $self, $node) = @_[KERNEL, HEAP, OBJECT, ARG0];
 	
-	my $attrs = $node->get_attrs();
+	my $attrs = $node->getAttributes();
 	my $config = $heap->config();
 	my $pending = $heap->pending();
 
@@ -166,7 +164,7 @@ sub init_input_handler()
             {
                 when('starttls')
                 {
-                    my $starttls = XNode->new('starttls', ['xmlns', +NS_XMPP_TLS]);
+                    my $starttls = POE::Filter::XML::Node->new('starttls', ['xmlns', +NS_XMPP_TLS]);
                     $kernel->yield('output_handler', $starttls, 1);
                     $kernel->post($heap->events(), +PCJ_SSLNEGOTIATE);
                     $self->{'STARTTLS'} = 1;
@@ -206,12 +204,14 @@ sub init_input_handler()
                         return;
                     }
 
-                    my $bind = XNode->new('bind' , ['xmlns', +NS_JABBER_COMPONENT])
-                        ->attr(
-                            'name', 
-                            $config->{'binddomain'} || 
-                            $config->{'username'} . '.' . $config->{'hostname'}
-                            );
+                    my $bind = POE::Filter::XML::Node->new
+                    (
+                        'bind' , 
+                        [
+                            'xmlns', +NS_JABBER_COMPONENT,
+                            'name', $config->{'binddomain'} || $config->{'username'} . '.' . $config->{'hostname'}
+                        ]
+                    );
                     
                     if(defined($config->{'bindoption'}))
                     {
@@ -252,7 +252,7 @@ sub binding()
 	{
 		$heap->relinquish_states();
 		$kernel->post($heap->events(), +PCJ_BINDSUCCESS);
-		$kernel->post($heap->events(), +PCJ_INIT_FINISHED);
+		$kernel->post($heap->events(), +PCJ_READY);
 		$heap->jid($config->{'binddomain'} ||
 			$config->{'username'} . '.' . $config->{'hostname'});
 	

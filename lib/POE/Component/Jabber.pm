@@ -1,6 +1,4 @@
 package POE::Component::Jabber;
-use Filter::Template;
-const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
@@ -44,6 +42,16 @@ use constant
 
 };
 
+use base('Exporter');
+our @EXPORT = qw/ JABBERD14_COMPONENT JABBERD20_COMPONENT LEGACY XMPP 
+    PCJ_CONNECT PCJ_CONNECTING PCJ_CONNECTED PCJ_STREAMSTART
+    PCJ_SSLNEGOTIATE PCJ_SSLSUCCESS PCJ_AUTHNEGOTIATE PCJ_AUTHSUCCESS
+    PCJ_BINDNEGOTIATE PCJ_BINDSUCCESS PCJ_SESSIONNEGOTIATE PCJ_SESSIONSUCCESS
+    PCJ_RECONNECT PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START
+    PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START
+    PCJ_SHUTDOWN_FINISH PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL
+    PCJ_BINDFAIL PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL PCJ_XPATHFILTER /;
+
 our $VERSION = '3.00';
 
 sub new()
@@ -74,7 +82,7 @@ sub new()
     $args->{'debug'}        ||= 0 ;
     $args->{'resource'}     ||= md5_hex(time().rand().$$.rand().$^T.rand());
     
-    $self->[+_pcj_events] = $args->{'events_alias'};
+    $self->[+_pcj_events] = $args->{'alias'};
 
     Carp::confess "$me requires ConnectionType to be defined" if not defined
         $args->{'connectiontype'};
@@ -89,6 +97,7 @@ sub new()
     Carp::confess "$me requires Port to be defined" if not defined
         $args->{'port'};
     
+    $POE::Component::PubSub::TRACE_AND_DEBUG = $args->{'debug'};
     POE::Component::PubSub->new($args->{'alias'});
 
     POE::Session->create
@@ -116,6 +125,7 @@ sub new()
                 'purge_queue',
                 'debug_purge_queue',
                 'xpath_filter',
+                'halt',
             ],
 
             $self =>
@@ -299,7 +309,7 @@ sub connect_error()
 }
 
 sub _start()
-{    
+{   
     my ($kernel, $self) = @_[KERNEL, OBJECT];
     $kernel->alias_set($self->[+_pcj_config]->{'alias'} . 'CORE');
     $self->_reset();
@@ -315,59 +325,59 @@ sub _start()
     
     my $pubsub = $self->[+_pcj_events];
     
-    $kernel->post($pubsub, 'publish', +PCJ_SOCKETFAIL);
-    $kernel->post($pubsub, 'publish', +PCJ_SOCKETDISCONNECT);
-    $kernel->post($pubsub, 'publish', +PCJ_AUTHFAIL);
-    $kernel->post($pubsub, 'publish', +PCJ_BINDFAIL);
-    $kernel->post($pubsub, 'publish', +PCJ_SESSIONFAIL);
-    $kernel->post($pubsub, 'publish', +PCJ_SSLFAIL);
-    $kernel->post($pubsub, 'publish', +PCJ_CONNECTFAIL);
-    $kernel->post($pubsub, 'publish', +PCJ_CONNECT);
-    $kernel->post($pubsub, 'publish', +PCJ_CONNECTING);
-    $kernel->post($pubsub, 'publish', +PCJ_CONNECTED);
-    $kernel->post($pubsub, 'publish', +PCJ_SSLNEGOTIATE);
-    $kernel->post($pubsub, 'publish', +PCJ_SSLSUCCESS);
-    $kernel->post($pubsub, 'publish', +PCJ_AUTHNEGOTIATE);
-    $kernel->post($pubsub, 'publish', +PCJ_AUTHSUCCESS);
-    $kernel->post($pubsub, 'publish', +PCJ_BINDNEGOTIATE);
-    $kernel->post($pubsub, 'publish', +PCJ_BINDSUCCESS);
-    $kernel->post($pubsub, 'publish', +PCJ_SESSIONNEGOTIATE);
-    $kernel->post($pubsub, 'publish', +PCJ_NODESENT);
-    $kernel->post($pubsub, 'publish', +PCJ_NODERECEIVED);
-    $kernel->post($pubsub, 'publish', +PCJ_NODEQUEUED);
-    $kernel->post($pubsub, 'publish', +PCJ_RTS_START);
-    $kernel->post($pubsub, 'publish', +PCJ_RTS_FINISH);
-    $kernel->post($pubsub, 'publish', +PCJ_READY);
-    $kernel->post($pubsub, 'publish', +PCJ_STREAMEND);
-    $kernel->post($pubsub, 'publish', +PCJ_STREAMSTART);
-    $kernel->post($pubsub, 'publish', +PCJ_SHUTDOWN_START);
-    $kernel->post($pubsub, 'publish', +PCJ_SHUTDOWN_FINISH);
-    $kernel->post($pubsub, 'publish', +PCJ_RECONNECT);
-    $kernel->post($pubsub, 'publish', +PCJ_XPATHFILTER);
+    $kernel->call($pubsub, 'publish', +PCJ_SOCKETFAIL);
+    $kernel->call($pubsub, 'publish', +PCJ_SOCKETDISCONNECT);
+    $kernel->call($pubsub, 'publish', +PCJ_AUTHFAIL);
+    $kernel->call($pubsub, 'publish', +PCJ_BINDFAIL);
+    $kernel->call($pubsub, 'publish', +PCJ_SESSIONFAIL);
+    $kernel->call($pubsub, 'publish', +PCJ_SSLFAIL);
+    $kernel->call($pubsub, 'publish', +PCJ_CONNECTFAIL);
+    $kernel->call($pubsub, 'publish', +PCJ_CONNECT);
+    $kernel->call($pubsub, 'publish', +PCJ_CONNECTING);
+    $kernel->call($pubsub, 'publish', +PCJ_CONNECTED);
+    $kernel->call($pubsub, 'publish', +PCJ_SSLNEGOTIATE);
+    $kernel->call($pubsub, 'publish', +PCJ_SSLSUCCESS);
+    $kernel->call($pubsub, 'publish', +PCJ_AUTHNEGOTIATE);
+    $kernel->call($pubsub, 'publish', +PCJ_AUTHSUCCESS);
+    $kernel->call($pubsub, 'publish', +PCJ_BINDNEGOTIATE);
+    $kernel->call($pubsub, 'publish', +PCJ_BINDSUCCESS);
+    $kernel->call($pubsub, 'publish', +PCJ_SESSIONNEGOTIATE);
+    $kernel->call($pubsub, 'publish', +PCJ_SESSIONSUCCESS);
+    $kernel->call($pubsub, 'publish', +PCJ_NODESENT);
+    $kernel->call($pubsub, 'publish', +PCJ_NODERECEIVED);
+    $kernel->call($pubsub, 'publish', +PCJ_NODEQUEUED);
+    $kernel->call($pubsub, 'publish', +PCJ_RTS_START);
+    $kernel->call($pubsub, 'publish', +PCJ_RTS_FINISH);
+    $kernel->call($pubsub, 'publish', +PCJ_READY);
+    $kernel->call($pubsub, 'publish', +PCJ_STREAMEND);
+    $kernel->call($pubsub, 'publish', +PCJ_STREAMSTART);
+    $kernel->call($pubsub, 'publish', +PCJ_SHUTDOWN_START);
+    $kernel->call($pubsub, 'publish', +PCJ_SHUTDOWN_FINISH);
+    $kernel->call($pubsub, 'publish', +PCJ_RECONNECT);
 
-    $kernel->post($pubsub, 'publish', 'output', 
+    $kernel->call($pubsub, 'publish', 'output', 
         +PUBLISH_INPUT, 'output_handler');
 
-    $kernel->post($pubsub, 'publish', 'return_to_sender', 
+    $kernel->call($pubsub, 'publish', 'return_to_sender', 
         +PUBLISH_INPUT, 'return_to_sender');
 
-    $kernel->post($pubsub, 'publish', 'xpath_filter',
+    $kernel->call($pubsub, 'publish', 'xpath_filter',
         +PUBLISH_INPUT, 'xpath_filter');
 
-    $kernel->post($pubsub, 'publish', 'shutdown',
+    $kernel->call($pubsub, 'publish', 'shutdown',
         +PUBLISH_INPUT, 'shutdown');
+    
+    $kernel->call($pubsub, 'publish', 'connect',
+        +PUBLISH_INPUT, 'connect');
 
-    $kernel->post($pubsub, 'publish', 'connect',
-        +PUBLISH_INPUT, 'publish', 'connect');
+    $kernel->call($pubsub, 'publish', 'reconnect',
+        +PUBLISH_INPUT, 'reconnect');
 
-    $kernel->post($pubsub, 'publish', 'reconnect',
-        +PUBLISH_INPUT, 'publish', 'reconnect');
+    $kernel->call($pubsub, 'publish', 'purge_queue',
+        +PUBLISH_INPUT, 'purge_queue');
 
-    $kernel->post($pubsub, 'publish', 'purge_queue',
-        +PUBLISH_INPUT, 'publish', 'purge_queue');
-
-    $kernel->post($pubsub, 'publish', 'destroy',
-        +PUBLISH_INPUT, 'publish', 'destroy');
+    $kernel->call($pubsub, 'publish', 'halt',
+        +PUBLISH_INPUT, 'halt');
     return;
 }
 
@@ -379,7 +389,7 @@ sub _stop()
     return;
 }
 
-sub destroy()
+sub halt()
 {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
     
@@ -552,7 +562,7 @@ sub initiate_stream()
     my ($kernel, $self, $sender, $session) = 
         @_[KERNEL, OBJECT, SENDER, SESSION];
 
-    my $element = XNode->new('stream:stream');
+    my $element = POE::Filter::XML::Node->new('stream:stream');
     $element->setAttributes
     (    
         [
@@ -599,7 +609,7 @@ sub shutdown()
 
     if(defined($self->[+_pcj_wheel]))
     {
-        my $node = XNode->new('stream:stream');
+        my $node = POE::Filter::XML::Node->new('stream:stream');
         $node->stream_end(1);
         
         $self->[+_pcj_shutdown] = 1;
@@ -743,7 +753,7 @@ sub input_handler()
     {
         my $nodes = 
         [
-            $node->findnodes($self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION])
+            map { ordain($_) } $node->findnodes($self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION])
         ];
 
         if(@$nodes)
@@ -752,6 +762,7 @@ sub input_handler()
             (
                 $self->[+_pcj_events], 
                 $self->[+_pcj_xpathfilters]->[$_]->[+EVENT],
+                $self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION],
                 $nodes,
                 $node
             );
@@ -786,7 +797,7 @@ sub debug_input_handler()
     {
         my $nodes = 
         [
-            $node->findnodes($self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION])
+            map { ordain($_) } $node->findnodes($self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION])
         ];
 
         if(@$nodes)
@@ -802,6 +813,7 @@ sub debug_input_handler()
             (
                 $self->[+_pcj_events], 
                 $self->[+_pcj_xpathfilters]->[$_]->[+EVENT],
+                $self->[+_pcj_xpathfilters]->[$_]->[+EXPRESSION],
                 $nodes,
                 $node
             );
@@ -847,8 +859,6 @@ sub xpath_filter()
 sub server_error()
 {
     my ($kernel, $self, $call, $code, $err) = @_[KERNEL, OBJECT, ARG0..ARG2];
-    
-    $self->debug_message("Server Error: $call: $code -> $err\n");
     
     $self->[+_pcj_wheel] = undef;
 

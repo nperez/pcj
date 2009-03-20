@@ -1,12 +1,10 @@
 package POE::Component::Jabber::XMPP;
-use Filter::Template;
-const XNode POE::Filter::XML::Node
 use warnings;
 use strict;
 
 use 5.010;
 use POE qw/ Wheel::ReadWrite /;
-use POE::Component::Jabber::Utility::SSLify qw/ Client_SSLify /;
+use POE::Component::SSLify qw/ Client_SSLify /;
 use POE::Component::Jabber::Events;
 use POE::Filter::XML;
 use POE::Filter::XML::Node;
@@ -63,7 +61,7 @@ sub set_auth()
 		}
 	);
 
-	my $node = XNode->new('auth', ['xmlns', +NS_XMPP_SASL, 'mechanism', $mech]);
+	my $node = POE::Filter::XML::Node->new('auth', ['xmlns', +NS_XMPP_SASL, 'mechanism', $mech]);
 
 	if ($mech eq 'PLAIN') 
 	{
@@ -108,7 +106,7 @@ sub challenge_response()
 	$step = encode_base64($step);
 	$step =~ s/\s+//go;
 
-	my $response = XNode->new('response', ['xmlns', +NS_XMPP_SASL]);
+	my $response = POE::Filter::XML::Node->new('response', ['xmlns', +NS_XMPP_SASL]);
 	$response->appendText($step);
 
 	$kernel->yield('output_handler', $response, 1);
@@ -151,7 +149,7 @@ sub init_input_handler()
             $kernel->yield('challenge_response', $node);
         } 
         
-        when ('failure' and $attrs->{'xmlns'} eq +NS_XMPP_SASL) 
+        when ('failure') 
         {
             $heap->debug_message('SASL Negotiation Failed');
             $kernel->yield('shutdown');
@@ -164,7 +162,7 @@ sub init_input_handler()
             {
                 when ('starttls')
                 {
-                    my $starttls = XNode->new('starttls', ['xmlns', +NS_XMPP_TLS]);
+                    my $starttls = POE::Filter::XML::Node->new('starttls', ['xmlns', +NS_XMPP_TLS]);
                     $kernel->yield('output_handler', $starttls, 1);
                     $kernel->post($heap->events(), +PCJ_SSLNEGOTIATE);
             
@@ -192,7 +190,7 @@ sub init_input_handler()
                 when('bind') 
                 {
             
-                    my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                    my $iq = POE::Filter::XML::Node->new('iq', ['type', +IQ_SET]);
                     $iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
                         ->appendChild('resource')
                         ->appendText($config->{'resource'});
@@ -216,9 +214,8 @@ sub init_input_handler()
                     {
                         $heap->relinquish_states();
                         $kernel->post(
-                            $heap->parent(),
-                            $heap->status(), 
-                            +PCJ_INIT_FINISHED);
+                            $heap->events(), 
+                            +PCJ_READY);
                     
                     } else {
 
@@ -260,21 +257,20 @@ sub binding()
         {
             if($self->{'STARTSESSION'})
             {
-                my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                my $iq = POE::Filter::XML::Node->new('iq', ['type', +IQ_SET]);
                 $iq->appendChild('session', ['xmlns', +NS_XMPP_SESSION]);
 
                 $kernel->yield('return_to_sender', 'session_establish', $iq);
-                $kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
+                $kernel->post($heap->events(), +PCJ_BINDSUCCESS);
                 $kernel->post(
-                    $heap->parent(),
-                    $heap->status(),
+                    $heap->events(),
                     +PCJ_SESSIONNEGOTIATE);
             
             } else {
                 
                 $heap->relinquish_states();
-                $kernel->post($heap->parent(),$heap->status(), +PCJ_BINDSUCCESS);
-                $kernel->post($heap->parent(),$heap->status(), +PCJ_INIT_FINISHED);
+                $kernel->post($heap->events(), +PCJ_BINDSUCCESS);
+                $kernel->post($heap->events(), +PCJ_READY);
             }
             
             $heap->jid($node->getSingleChildByTagName('bind')->getSingleChildByTagName('jid')->textContent());
@@ -290,7 +286,7 @@ sub binding()
             {
                 when('modify')
                 {
-                    my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                    my $iq = POE::Filter::XML::Node->new('iq', ['type', +IQ_SET]);
                     $iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
                         ->appendChild('resource')
                         ->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
@@ -303,7 +299,7 @@ sub binding()
                     
                     if(exists($clist->{'conflict'}))
                     {
-                        my $iq = XNode->new('iq', ['type', +IQ_SET]);
+                        my $iq = POE::Filter::XML::Node->new('iq', ['type', +IQ_SET]);
                         $iq->appendChild('bind', ['xmlns', +NS_XMPP_BIND])
                             ->appendChild('resource')
                             ->appendText(md5_hex(time().rand().$$.rand().$^T.rand()));
@@ -339,7 +335,7 @@ sub session_establish()
         {
             $heap->relinquish_states();
             $kernel->post($heap->events(), +PCJ_SESSIONSUCCESS);
-            $kernel->post($heap->events(),	+PCJ_INIT_FINISHED);
+            $kernel->post($heap->events(), +PCJ_READY);
         }
 
         when(+IQ_ERROR) 

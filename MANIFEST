@@ -5,17 +5,13 @@ examples/J2Component
 examples/LegacyClient
 examples/XMPPClient
 lib/POE/Component/Jabber.pm
-lib/POE/Component/Jabber/Error.pm
+lib/POE/Component/Jabber/Events.pm
 lib/POE/Component/Jabber/J14.pm
 lib/POE/Component/Jabber/J2.pm
 lib/POE/Component/Jabber/Legacy.pm
 lib/POE/Component/Jabber/Protocol.pm
 lib/POE/Component/Jabber/ProtocolFactory.pm
-lib/POE/Component/Jabber/Status.pm
 lib/POE/Component/Jabber/XMPP.pm
-lib/POE/Component/Jabber/Utility/SSLify.pm
-lib/POE/Component/Jabber/Utility/ClientHandle.pm
-lib/POE/Component/Jabber/Utility/ServerHandle.pm
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
