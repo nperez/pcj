@@ -7,39 +7,38 @@ use constant
 	'PCJ_CONNECT'			=> 'PCJ_CONNECT',
 	'PCJ_CONNECTING'		=> 'PCJ_CONNECTING',
 	'PCJ_CONNECTED'			=> 'PCJ_CONNECTED',
+    'PCJ_CONNECTFAIL'       => 'PCJ_CONNECTFAIL',
 	'PCJ_STREAMSTART'		=> 'PCJ_STEAMSTART',
-	'PCJ_SSLNEGOTIATE'		=> 'PCJ_SSLNEGOTIATE',
-	'PCJ_SSLSUCCESS'		=> 'PCJ_SSLSUCCESS',
-	'PCJ_AUTHNEGOTIATE'		=> 'PCJ_AUTHNEGOTIATE',
-	'PCJ_AUTHSUCCESS'		=> 'PCJ_AUTHSUCCESS',
-	'PCJ_BINDNEGOTIATE'		=> 'PCJ_BINDNEGOTIATE',
-	'PCJ_BINDSUCCESS'		=> 'PCJ_BINDSUCCESS',
-	'PCJ_SESSIONNEGOTIATE'	=> 'PCJ_SESSIONNEGOTIATE',
-	'PCJ_SESSIONSUCCESS'	=> 'PCJ_SESSIONSUCCESS',
+	'PCJ_STREAMEND'			=> 'PCJ_STREAMEND',
 	'PCJ_NODESENT'			=> 'PCJ_NODESENT',
 	'PCJ_NODERECEIVED'		=> 'PCJ_NODERECEIVED',
 	'PCJ_NODEQUEUED'		=> 'PCJ_NODEQUEUED',
+	'PCJ_SSLNEGOTIATE'		=> 'PCJ_SSLNEGOTIATE',
+	'PCJ_SSLSUCCESS'		=> 'PCJ_SSLSUCCESS',
+    'PCJ_SSLFAIL'           => 'PCJ_SSLFAIL',
+	'PCJ_AUTHNEGOTIATE'		=> 'PCJ_AUTHNEGOTIATE',
+	'PCJ_AUTHSUCCESS'		=> 'PCJ_AUTHSUCCESS',
+    'PCJ_AUTHFAIL'          => 'PCJ_AUTHFAIL',
+	'PCJ_BINDNEGOTIATE'		=> 'PCJ_BINDNEGOTIATE',
+	'PCJ_BINDSUCCESS'		=> 'PCJ_BINDSUCCESS',
+    'PCJ_BINDFAIL'          => 'PCJ_BINDFAIL',
+	'PCJ_SESSIONNEGOTIATE'	=> 'PCJ_SESSIONNEGOTIATE',
+	'PCJ_SESSIONSUCCESS'	=> 'PCJ_SESSIONSUCCESS',
+    'PCJ_SESSIONFAIL'       => 'PCJ_SESSIONFAIL',
 	'PCJ_RTS_START'			=> 'PCJ_RTS_START',
 	'PCJ_RTS_FINISH'		=> 'PCJ_RTS_FINISH',
 	'PCJ_READY'     		=> 'PCJ_READY',
-	'PCJ_STREAMEND'			=> 'PCJ_STREAMEND',
 	'PCJ_SHUTDOWN_START'	=> 'PCJ_SHUTDOWN_START',
 	'PCJ_SHUTDOWN_FINISH'	=> 'PCJ_SHUTDOWN_FINISH',
-    'PCJ_RECONNECT'         => 'PCJ_RECONNECT',
     'PCJ_SOCKETFAIL'        => 'PCJ_SOCKETFAIL',
     'PCJ_SOCKETDISCONNECT'  => 'PCJ_SOCKETDISCONNECT',
-    'PCJ_AUTHFAIL'          => 'PCJ_AUTHFAIL',
-    'PCJ_BINDFAIL'          => 'PCJ_BINDFAIL',
-    'PCJ_SESSIONFAIL'       => 'PCJ_SESSIONFAIL',
-    'PCJ_SSLFAIL'           => 'PCJ_SSLFAIL',
-    'PCJ_CONNECTFAIL'       => 'PCJ_CONNECTFAIL',
 };
 
 use base('Exporter');
 our @EXPORT = qw/ PCJ_CONNECT PCJ_CONNECTING PCJ_CONNECTED PCJ_STREAMSTART 
 	PCJ_SSLNEGOTIATE PCJ_SSLSUCCESS PCJ_AUTHNEGOTIATE PCJ_AUTHSUCCESS 
 	PCJ_BINDNEGOTIATE PCJ_BINDSUCCESS PCJ_SESSIONNEGOTIATE PCJ_SESSIONSUCCESS 
-	PCJ_RECONNECT PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START 
+	PCJ_NODESENT PCJ_NODERECEIVED PCJ_NODEQUEUED PCJ_RTS_START 
 	PCJ_RTS_FINISH PCJ_READY PCJ_STREAMEND PCJ_SHUTDOWN_START
 	PCJ_SHUTDOWN_FINISH PCJ_SOCKETFAIL PCJ_SOCKETDISCONNECT PCJ_AUTHFAIL 
     PCJ_BINDFAIL PCJ_SESSIONFAIL PCJ_SSLFAIL PCJ_CONNECTFAIL /;
@@ -57,15 +56,40 @@ POE::Component::Jabber::Events
 
 =head1 SYNOPSIS
 
-PCJ::Status exports many useful constants for tracking the status of PCJ during
-it's operation.
+  PCJ_CONNECT
+  PCJ_CONNECTING
+  PCJ_CONNECTED
+  PCJ_CONNECTFAIL
+  PCJ_STREAMSTART
+  PCJ_STREAMEND
+  PCJ_NODESENT
+  PCJ_NODERECEIVED
+  PCJ_NODEQUEUED
+  PCJ_SSLNEGOTIATE
+  PCJ_SSLSUCCESS
+  PCJ_SSLFAIL
+  PCJ_AUTHNEGOTIATE
+  PCJ_AUTHSUCCESS
+  PCJ_AUTHFAIL
+  PCJ_BINDNEGOTIATE
+  PCJ_BINDSUCCESS
+  PCJ_BINDFAIL
+  PCJ_SESSIONNEGOTIATE
+  PCJ_SESSIONSUCCESS
+  PCJ_SESSIONFAIL
+  PCJ_RTS_START
+  PCJ_RTS_FINISH
+  PCJ_READY
+  PCJ_SHUTDOWN_START
+  PCJ_SHUTDOWN_FINISH
+  PCJ_SOCKETFAIL
+  PCJ_SOCKETDISCONNECT
 
 =head1 DESCRIPTION
 
-PCJ, through the StatusEvent, will spit out various statuses for just about 
-every step practical during normal operation. This includes being engaged during
-the various Protocol specific portions that get loaded to handle the
-dialects PCJ supports.
+POE::Component::Jabber::Events exports many useful constants for tracking the 
+status of PCJ during its operation. Simply subscribe to these events in order
+to receive notification.
 
 =head1 EXPORTS
 
@@ -95,12 +119,17 @@ while LEGACY will only send one).
 =item PCJ_SSLNEGOTIATE
 
 TLS/SSL negotiation has begun.
-This Status event only is fired from XMPP and JABBERD20_COMPONENT connections.
+This event only is fired from XMPP and JABBERD20_COMPONENT connections.
 
 =item PCJ_SSLSUCCESS
 
 TLS/SSL negotiation has successfully complete. Socket layer is now encrypted. 
-This Status event only is fired from XMPP and JABBERD20_COMPONENT connections.
+This event only is fired from XMPP and JABBERD20_COMPONENT connections.
+
+=item PCJ_SSLFAIL
+
+TLS/SSL negotiation has failed.
+This event only is fired from XMPP and JABBERD20_COMPONENT connections.
 
 =item PCJ_AUTHNEGOTIATE
 
@@ -111,13 +140,17 @@ is in process when this status is received.
 
 Authentication was successful.
 
+=item PCJ_AUTHFAIL
+
+Authentication failed.
+
 =item PCJ_BINDNEGOTIATE
 
 For XMPP connections: this indicates resource binding negotiation has begun.
 
 For JABBERD20_COMPONENT connections: domain binding negotiation has begun.
 
-This Status event will not fire for any but the above two connection types.
+This event will not fire for any but the above two connection types.
 
 =item PCJ_BINDSUCCESS
 
@@ -126,7 +159,11 @@ sucessful.
 
 For JABBERD20_COMPONENT connections: domain binding negotiation was successful.
 
-This Status event will not fire for any but the above two connection types.
+This event will not fire for any but the above two connection types.
+
+=item PCJ_BINDFAIL
+
+Binding for which ever context has failed.
 
 =item PCJ_SESSIONNEGOTIATE
 
@@ -137,32 +174,39 @@ Only for XMPP: This indicates session binding (XMPP IM) negotiation has begun.
 Only for XMPP: This indicates session binding (XMPP IM) negotiation was
 successful.
 
+=item PCJ_SESSIONFAIL
+
+Session negotiation has failed for which ever context.
+
 =item PCJ_NODESENT
 
-A Node has been placed, outbound, into the Wheel
+A Node has been placed, outbound, into the Wheel. ARG0 will be the node.
 
 =item PCJ_NODERECEIVED
 
-A Node has been received.
+A Node has been received. ARG0 will be the node.
 
 =item PCJ_NODEQUEUED
 
 An attempt to send a Node while there is no valid, initialized connection was 
-caught. The Node has been queued. See PCJ event 'purge_queue' for details.
+caught. The Node has been queued. See POE::Component::Jabber event 
+'purge_queue' for details. ARG0 will be the node.
 
 =item PCJ_RTS_START
 
-A return_to_sender event has been fired for an outbound node.
+A return_to_sender event has been fired for an outbound node. ARG0 will be the
+node.
 
 =item PCJ_RTS_FINISH
 
-A return_to_sender event has been fired for a matching inbound node.
+A return_to_sender event has been fired for a matching inbound node. ARG0 will
+be the node.
 
-=item PCJ_INIT_FINISHED
+=item PCJ_READY
 
 This event indicates that the connection is fully initialized and ready for use.
 
-Watch for this event and begin packat transactions AFTER it has been fired.
+Watch for this event and begin packet transactions AFTER it has been fired.
 
 =item PCJ_STREAMEND
 
@@ -178,10 +222,20 @@ tearing down the connection.
 
 This indicates that 'shutdown' is complete.
 
+=item PCJ_SOCKETFAIL
+
+This indicates a socket level error. ARG0..ARG2 will be exactly what was passed
+to us from POE::Wheel::ReadWrite.
+
+=item PCJ_SOCKETDISCONNECT
+
+This indicates the socket has disconnected and will occur in both normal, and 
+in error states.
+
 =back
 
 =head1 AUTHOR
 
-(c) Copyright 2007 Nicholas Perez. Released under the GPL.
+(c) Copyright 2007-2009 Nicholas Perez. Released under the GPL.
 
 =cut

@@ -150,6 +150,8 @@ This handles construction and sending of the iq:auth query.
 This is our main entry point. This is used by PCJ to deliver all input events 
 until we are finished. Also handles responses to authentication.
 
+=back
+
 =head1 NOTES AND BUGS
 
 Ideally, this class wouldn't be necessary, but there is a large unmoving mass 

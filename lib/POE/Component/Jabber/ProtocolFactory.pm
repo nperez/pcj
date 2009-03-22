@@ -115,6 +115,6 @@ receives an invalid argument.
 
 =head1 AUTHOR
 
-(c) Copyright 2007 Nicholas Perez. Released under the GPL.
+(c) Copyright 2007-2009 Nicholas Perez. Released under the GPL.
 
 =cut

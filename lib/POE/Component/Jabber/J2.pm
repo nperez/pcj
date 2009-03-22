@@ -80,7 +80,7 @@ sub challenge_response()
 	if ($config->{'debug'}) {
 		$heap->debug_message(	
 			"Server sent a challenge.  Decoded Challenge:\n" .
-			decode_base64( $node->data() )
+			decode_base64( $node->textContent() )
 		);
 	}
 	
@@ -355,6 +355,8 @@ This handles the subsequent SASL authentication steps.
 =item binding
 
 This handles the domain binding
+
+=back
 
 =head1 NOTES AND BUGS
 

@@ -1,32 +1,8 @@
 NAME
     POE::Component::Jabber - A POE Component for communicating over Jabber
 
-SYNOPSIS
-     use POE;
-     use POE::Component::Jabber;
-     use POE::Component::Jabber::Error;
-     use POE::Component::Jabber::Status;
-     use POE::Component::Jabber::ProtocolFactory;
-     use POE::Filter::XML::Node;
-     use POE::Filter::XML::NS qw/ :JABBER :IQ /;
-
-     POE::Component::Jabber->new(
-       IP => 'jabber.server',
-       PORT => '5222',
-       HOSTNAME => 'jabber.server',
-       USERNAME => 'username',
-       PASSWORD => 'password',
-       ALIAS => 'PCJ',
-       STATES => {
-             StatusEvent => 'StatusHandler',
-             InputEvent => 'InputHandler',
-             ErrorEvent => 'ErrorHandler',
-       }
-     );
-     
- $poe_kernel->post('PCJ', 'connect', $node);
-     $poe_kernel->post('PCJ', 'output_handler', $node);
-     $poe_kernel->post('PCJ', 'return_to_sender', $node);
+VERSION
+    3.00
 
 DESCRIPTION
     PCJ is a communications component that fits within the POE framework and
@@ -70,9 +46,32 @@ METHODS
           Defaults to the class name.
 
         CONNECTIONTYPE
-          This is the type of connection you wish to esablish. Please use
-          the constants provided in PCJ::ProtocolFactory for the basis of
-          this argument. There is no default.
+          This is the type of connection you wish to esablish. There four
+          possible types available for use. One must be selected. Each item
+          is exported by default.
+
+          XMPP (XMPP.pm)
+            This connection type is for use with XMPP 1.0 compliant servers.
+            It implements all of the necessary functionality for TLS,
+            binding, and session negotiation.
+
+          LEGACY (Legacy.pm)
+            LEGACY is for use with pre-XMPP Jabber servers. It uses the old
+            style authentication and non-secured socket communication.
+
+          JABBERD14_COMPONENT (J14.pm)
+            Use this connection type if designing a backbone level component
+            for a server that implements XEP-114 for router level
+            communication.
+
+          JABBERD20_COMPONENT (J2.pm)
+            If making a router level connection to the jabberd2 server, use
+            this connection type. It implements the modified XMPP protocol,
+            which does most of it except the session negotiation.
+
+          Each connection type has a corresponding module. See their
+          respective documentation for more information each protocol
+          dialect.
 
         VERSION
           If for whatever reason you want to override the protocol version
@@ -91,34 +90,6 @@ METHODS
           attribute in the <stream:stream/> this is the argument to use.
           This SHOULD NOT ever need to be altered, but it is available and
           documented just in case.
-
-        STATEPARENT
-          The alias or session id of the session you want the component to
-          contact. This is optional provided to instantiate PCJ within
-          another POE::Session. In that case, that session will be assumed
-          to be the recepient of events.
-
-        STATES
-
-          StatusEvent
-            The StatusEvent will receive an event for every status change
-            within PCJ. This is useful for providing feedback to the end
-            user on what exactly the client or service is doing. Please see
-            POE::Component::Jabber::Status for exported constants and what
-            they signify.
-
-          InputEvent
-            The InputEvent will receive an event for every jabber packet
-            that comes through the connection once fully initialized. ARG0
-            will be a reference to a POE::Filter::XML::Node. Please see
-            POE::Filter::XML::Node documentation for ways to get the
-            information out of the Nodes and construct Nodes of your own.
-
-          ErrorEvent
-            The error event will be fired upon a number of detected error
-            conditions within PCJ. Please see the
-            POE::Component::Jabber::Error documentation for possible error
-            states.
 
         DEBUG
           If bool true, will enable debugging and tracing within the
@@ -147,27 +118,6 @@ METHODS
         If provided an argument, that argument will replace the current
         configuration.
 
-    parent() [Public]
-        parent() returns either the session ID from the intantiating
-        session, or the alias or ID provided in the constructor. If provided
-        an argument, that argument will replace the current parent seesion
-        ID or alias stored.
-
-    input() [Public]
-        input() returns the current event used by PCJ to deliver input
-        events. If provided an argument, that argument will replace the
-        current input event used.
-
-    status() [Public]
-        status() returns the current event used by PCJ to deliver status
-        events. If provided an argument, that argument will replace the
-        current status event used.
-
-    error() [Public]
-        error() returns the current event used by PCJ to deliver error
-        events. If provided an argument, that argument will replace the
-        current error event used.
-
     pending() [Protected]
         pending() returns a hash reference to the currently pending
         return_to_sender transactions keyed by the 'id' attribute of the XML
@@ -182,7 +132,7 @@ METHODS
         more information.
 
     _reset() [Private]
-        _reset() returns PCJ back to its initial state and returns nothing;
+        _reset() returns PCJ back to its initial state and returns nothing.
 
     _gather_options() [Private]
         _gather_options() takes an array reference of the arguments provided
@@ -192,10 +142,10 @@ METHODS
     relinquish_states() [Protected]
         relinquish_states() is used by Protocol subclasses to return control
         of the events back to the core of PCJ. It is typically called when
-        the event PCJ_INIT_FINISH is fired to the status event handler.
+        the event PCJ_READY is fired to the events handler.
 
-EVENTS
-    'output_handler'
+PUBLISHED INPUT EVENTS
+    'output'
         This is the event that you use to push data over the wire. It
         accepts only one argument, a reference to a POE::Filter::XML::Node.
 
@@ -203,8 +153,36 @@ EVENTS
         This event takes (1) a POE::Filter::XML::Node and gives it a unique
         id, and (2) a return event and places it in the state machine. Upon
         receipt of response to the request, the return event is fired with
-        the response packet. Note: the return event is post()ed in the
-        context of the provided or default parant session.
+        the response packet.
+
+        POE::Component::Jabber will publish the return event upon receipt,
+        and rescind the event once the the return event is fired.
+
+        In the context POE::Component::PubSub, this means that a
+        subscription must exist to the return event. Subscriptions can be
+        made prior to publishing.
+
+        Please note that return_to_sender short circuits before XPATH filter
+        and normal node received events.
+
+    'xpath_filter'
+        This event takes (1) a command of either 'add' or 'remove', (2) and
+        event name to be called upon a successful match, and (3) an XPATH
+        expression.
+
+        With 'add', all three arguments are required. With 'remove', only
+        the event name is required.
+
+        Like return_to_sender, POE::Component::Jabber will publish the
+        return event upon receipt, but will NOT rescind once the filter
+        matches something. This allows for persistent filters and event
+        dispatching.
+
+        Every filter is evaluated for every packet (if not applicable to
+        return_to_sender processing), allowing multiple overlapping filters.
+        And event names are not checked to be unique, so be careful when
+        adding filters that go to the same event, because 'remove' will
+        remove all instances of that particular event.
 
     'shutdown'
         The shutdown event terminates the XML stream which in turn will
@@ -215,48 +193,46 @@ EVENTS
         port. This event may also be called without any arguments and it
         will force the component to [re]connect.
 
+        This event must be posted before the component will initiate a
+        connection.
+
     'purge_queue'
-        If Nodes are sent to the output_handler when there isn't a fully
+        If Nodes are sent to the output event when there isn't a fully
         initialized connection, the Nodes are placed into a queue. PCJ will
         not automatically purge this queue when a suitable connection DOES
         become available because there is no way to tell if the packets are
         still valid or not. It is up to the end developer to decide this and
-        fire this event. Packets will be setn in the order in which they
+        fire this event. Packets will be sent in the order in which they
         were received.
 
-NOTES AND BUGS
+PUBLISHED OUTPUT EVENTS
+    Please see POE::Component::Jabber::Events for a list of published events
+    to which subscriptions can be made.
+
+CHANGES
+    From the 2.X branch, several changes have been made improve event
+    management.
+
+    The guts are now based around POE::Component::PubSub. This enables very
+    specific subscriptions to status events rather than all of the status
+    events being delivered to a single event.
+
+    Also, using the new POE::Filter::XML means that the underlying XML
+    parser and Node implementation has changed for the better but also
+    introduced API incompatibilities. For the most part, a simple
+    search-and-replace will suffice. Well worth it for the power to apply
+    XPATH expressions to nodes.
+
+NOTES
     This is a connection broker. This should not be considered a first class
     client or service. This broker basically implements whatever core
     functionality is required to get the end developer to the point of
     writing upper level functionality quickly.
 
-    In the case of XMPP what is implemented: XMPP Core. A small portion of
-    XMPP IM (session binding).
-
-    Legacy: Basic authentication via iq:auth. (No presence management, no
-    roster management)
-
-    JABBERD14: Basic handshake. (No automatic addressing management of the
-    'from' attribute)
-
-    JABBERD20: XMPP Core like semantics. Domain binding. (No route packet
-    enveloping or presence management)
-
-    With the major version increase, significant changes have occured in how
-    PCJ handles itself and how it is constructed. PCJ no longer connects
-    when it is instantiated. The 'connect' event must be post()ed for PCJ to
-    connect.
-
+EXAMPLES
     For example implementations using all four current aspects, please see
     the examples/ directory in the distribution.
 
 AUTHOR
-    Copyright (c) 2003-2007 Nicholas Perez. Distributed under the GPL.
-
-POD ERRORS
-    Hey! The above document had some coding errors, which are explained
-    below:
-
-    Around line 1054:
-        You forgot a '=back' before '=head1'
+    Copyright (c) 2003-2009 Nicholas Perez. Distributed under the GPL.
 

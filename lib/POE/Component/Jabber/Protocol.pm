@@ -69,7 +69,7 @@ this was solved by having different duplicate classes in the same domain with
 these differences manifest. It led to lots of headaches if there was a problem
 because it then needed to be fixed in four places.
 
-The solution is to keep the core aspect of PCJ unmutable, while loading
+The solution is to keep the core aspect of PCJ immutable, while loading
 separate individual Protocol classes that then implement the details for each
 specific dialect.
 
@@ -151,13 +151,13 @@ Protocol subclassees execute within the same Session space as PCJ
 $_[HEAP] contains the PCJ object.
 If you need storage space, use $_[OBJECT] (ie. yourself).
 Send status events. See PCJ::Status
-Don't forget to send PCJ_INIT_FINISHED.
+Don't forget to send PCJ_READY.
 And don't forget to call $_[HEAP]->relinquish_states() when finished.
 When in doubt, use the source!
 
 =head1 AUTHOR
 
-Copyright (c) 2007 Nicholas Perez. Distributed under the GPL.
+Copyright (c) 2007-2009 Nicholas Perez. Distributed under the GPL.
 
 =cut
 

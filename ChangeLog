@@ -1,3 +1,14 @@
+2009-03-22 nperez <nperez@cpan.org>
+	* Major revision: 3.00
+	* NOT BACKWARD COMPATIBLE WITH PREVIOUS 2.X BRANCH
+	* Use new 5.10.0 constructs and features
+	* New publish/subscribe interface for status events and more
+	* Based on new POE::Filter::XML 0.35 which is now based on XML::LibXML
+	* Revert to dependency on POE::Component::SSLify
+	* Drop Filter::Template dependency
+	* All constants are now exported through POE::Component::Jabber
+	* New XPATH based filtering (due to XML::LibXML usage)
+
 2008-07-26 nperez <nperez@cpan.org>
 	* Maint revision: 2.03
 	* Package and distribute SSL code to avoid dep explosion

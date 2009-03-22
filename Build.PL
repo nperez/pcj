@@ -78,6 +78,7 @@ Module::Build->new
 		'MIME::Base64' => '3.07_01',
 		'POE::Filter::XML' => '0.35',
         'POE::Component::SSLify' => '0.15',
+        'POE::Component::PubSub' => '0.05',
 
 	}
 )->create_build_script();

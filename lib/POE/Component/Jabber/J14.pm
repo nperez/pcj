@@ -117,6 +117,8 @@ This event constructs and sends the <handshake/> element for authentication.
 This is out main entry point that PCJ uses to send us all of the input. It
 handles the authentication response.
 
+=back
+
 =head1 NOTES AND BUGS
 
 This only implements the jabber:component:accept namespace (ie. the component
