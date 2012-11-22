@@ -160,66 +160,67 @@ sub init_input_handler()
         
         when('stream:features') 
         {
-            given($node->getChildrenHash())
-            {
-                when('starttls')
+            for my $key ( keys $node->getChildrenHash() ) {
+                given($key)
                 {
-                    my $starttls = POE::Filter::XML::Node->new('starttls', ['xmlns', +NS_XMPP_TLS]);
-                    $kernel->yield('output_handler', $starttls, 1);
-                    $kernel->post($heap->events(), +PCJ_SSLNEGOTIATE);
-                    $self->{'STARTTLS'} = 1;
-                
-                } 
-                when('mechanisms')
-                {    
-                    if(!defined($self->{'STARTTLS'}))
+                    when('starttls')
                     {
-                        $kernel->post($heap->events(), +PCJ_SSLFAIL);
-                        $kernel->yield('shutdown');
-                        return;
+                        my $starttls = POE::Filter::XML::Node->new('starttls', ['xmlns', +NS_XMPP_TLS]);
+                        $kernel->yield('output_handler', $starttls, 1);
+                        $kernel->post($heap->events(), +PCJ_SSLNEGOTIATE);
+                        $self->{'STARTTLS'} = 1;            
                     }
-                    
-                    foreach($_->{'mechanisms'}->[0]->getChildrenByTagName('*'))
-                    {
-                        when($_->textContent() eq 'DIGEST-MD5' or $_->textContent() eq 'PLAIN')
+                    when('mechanisms')
+                    {    
+                        if(!defined($self->{'STARTTLS'}))
                         {
-                            $kernel->yield('set_auth', $_->textContent());
-                            $kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
+                            $kernel->post($heap->events(), +PCJ_SSLFAIL);
+                            $kernel->yield('shutdown');
                             return;
                         }
-                    }
                     
-                    $heap->debug_message('Unknown mechanism: '.$node->toString());
-                    $kernel->yield('shutdown');
-                    $kernel->post($heap->events(), +PCJ_AUTHFAIL);
-                
-                } 
-
-                when(sub() { !keys %$_; })
-                {
-                    if(!defined($self->{'STARTTLS'}))
-                    {
-                        $kernel->post($heap->events(), +PCJ_SSLFAIL);
+                        foreach($node->getChildrenHash()->{$key}->[0]->getChildrenByTagName('*'))
+                        {
+                            when($_->textContent() eq 'DIGEST-MD5' or $_->textContent() eq 'PLAIN')
+                            {
+                                $kernel->yield('set_auth', $_->textContent());
+                                $kernel->post($heap->events(), +PCJ_AUTHNEGOTIATE);
+                                return;
+                            }
+                        }
+                    
+                        $heap->debug_message('Unknown mechanism: '.$node->toString());
                         $kernel->yield('shutdown');
-                        return;
-                    }
+                        $kernel->post($heap->events(), +PCJ_AUTHFAIL);
+                
+                    } 
 
-                    my $bind = POE::Filter::XML::Node->new
-                    (
-                        'bind' , 
-                        [
-                            'xmlns', +NS_JABBER_COMPONENT,
-                            'name', $config->{'binddomain'} || $config->{'username'} . '.' . $config->{'hostname'}
-                        ]
-                    );
-                    
-                    if(defined($config->{'bindoption'}))
+                    when(sub() { !keys %$_; })
                     {
-                        $bind->appendChild($config->{'bindoption'});
-                    }
+                        if(!defined($self->{'STARTTLS'}))
+                        {
+                            $kernel->post($heap->events(), +PCJ_SSLFAIL);
+                            $kernel->yield('shutdown');
+                            return;
+                        }
+
+                        my $bind = POE::Filter::XML::Node->new
+                        (
+                            'bind' , 
+                            [
+                                'xmlns', +NS_JABBER_COMPONENT,
+                                'name', $config->{'binddomain'} || $config->{'username'} . '.' . $config->{'hostname'}
+                            ]
+                        );
                     
-                    $kernel->yield('return_to_sender', 'binding', $bind);
-                    $kernel->post($heap->events(), +PCJ_BINDNEGOTIATE);
+                        if(defined($config->{'bindoption'}))
+                        {
+                            $bind->appendChild($config->{'bindoption'});
+                        }
+                    
+                        $kernel->yield('return_to_sender', 'binding', $bind);
+                        $kernel->post($heap->events(), +PCJ_BINDNEGOTIATE);
+                    }
                 }
             }
 
